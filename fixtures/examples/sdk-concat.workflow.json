@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "0.1",
+  "workflowId": "sdk-concat",
+  "revision": 1,
+  "nodes": [
+    {"id":"input","typeId":"core.text-input","version":1,"config":{"text":"ready"}},
+    {"id":"prompt","typeId":"ai.prompt","version":1,"config":{"text":"release"}},
+    {"id":"join","typeId":"sample.concat","version":1,"config":{"parameters":{"separator":" / ","casing":"upper"}}},
+    {"id":"output","typeId":"core.output","version":1,"config":{}}
+  ],
+  "edges": [
+    {"id":"left","source":"input","sourcePort":"text","target":"join","targetPort":"left","kind":"message"},
+    {"id":"branch","source":"input","sourcePort":"text","target":"prompt","targetPort":"in","kind":"message"},
+    {"id":"right","source":"prompt","sourcePort":"text","target":"join","targetPort":"right","kind":"message"},
+    {"id":"result","source":"join","sourcePort":"text","target":"output","targetPort":"value","kind":"message"}
+  ],
+  "layout": {
+    "input":{"x":55,"y":90}, "prompt":{"x":320,"y":260},
+    "join":{"x":595,"y":135}, "output":{"x":900,"y":135}
+  }
+}

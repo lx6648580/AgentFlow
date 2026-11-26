@@ -1,0 +1,17 @@
+{
+  "root": "../../work/phase06-device-data",
+  "http": {
+    "device-sim": "http://127.0.0.1:5190/sim/device",
+    "device-api": "http://127.0.0.1:5190/api/devices/pump-01",
+    "sim-redirect": "http://127.0.0.1:5190/sim/redirect",
+    "sim-binary": "http://127.0.0.1:5190/sim/binary",
+    "sim-large": "http://127.0.0.1:5190/sim/large",
+    "sim-slow": "http://127.0.0.1:5190/sim/slow"
+  },
+  "mcp": {
+    "devices": { "url": "http://127.0.0.1:5190/mcp", "tools": ["read_device"] }
+  },
+  "sqlite": {
+    "device-history": { "path": "devices.db", "table": "devices" }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "0.1",
+  "workflowId": "chat-example",
+  "revision": 1,
+  "nodes": [
+    { "id": "input", "typeId": "core.text-input", "version": 1, "config": { "text": "Reply with exactly READY." } },
+    { "id": "model", "typeId": "ai.chat-model", "version": 1, "config": { "text": "mock" } },
+    { "id": "agent", "typeId": "ai.agent", "version": 1, "config": { "text": "Follow the user's instruction and answer briefly." } },
+    { "id": "output", "typeId": "core.output", "version": 1, "config": {} }
+  ],
+  "edges": [
+    { "id": "input-agent", "source": "input", "sourcePort": "text", "target": "agent", "targetPort": "in", "kind": "message" },
+    { "id": "model-agent", "source": "model", "sourcePort": "model", "target": "agent", "targetPort": "model", "kind": "resource" },
+    { "id": "agent-output", "source": "agent", "sourcePort": "text", "target": "output", "targetPort": "value", "kind": "message" }
+  ],
+  "layout": {
+    "input": { "x": 65, "y": 85 },
+    "model": { "x": 65, "y": 280 },
+    "agent": { "x": 350, "y": 150 },
+    "output": { "x": 635, "y": 160 }
+  }
+}

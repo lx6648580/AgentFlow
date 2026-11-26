@@ -1,0 +1,99 @@
+@using System.Text.Json
+@inject IJSRuntime Js
+
+<dialog id="node-help-dialog" class="model-manager node-help-dialog" aria-labelledby="node-help-title" @ref="dialog">
+    <header class="model-manager-heading">
+        <h2 id="node-help-title">@Board.T("NodeHelp") @if (definition is { } entry) { <text>· @Board.Label(entry.Name, entry.TypeId)</text> }</h2>
+        <form method="dialog"><button type="submit" autofocus>@Board.T("Close")</button></form>
+    </header>
+    @if (node is { } target && definition is { } details)
+    {
+        <div class="node-help-body" data-node-help-type="@details.TypeId">
+            <p class="node-help-meta"><code>@details.TypeId</code> · v@(details.Version)</p>
+            <section aria-labelledby="node-help-usage">
+                <h3 id="node-help-usage">@Board.T("NodeHelpUsage")</h3>
+                <p data-node-help-usage>@Board.Label(documentation?.Usage, Board.Label(details.Help, Board.T("NodeHelpUsageFallback")))</p>
+            </section>
+            <section aria-labelledby="node-help-maf">
+                <h3 id="node-help-maf">@Board.T("NodeHelpMaf")</h3>
+                <p data-node-help-maf>@Board.Label(documentation?.MafMapping, Board.T("NodeHelpMafFallback"))</p>
+                @if (Uri.TryCreate(documentation?.ReferenceUrl, UriKind.Absolute, out var link) && link.Scheme == Uri.UriSchemeHttps)
+                {
+                    <a href="@link.AbsoluteUri" target="_blank" rel="noopener noreferrer">@Board.T("NodeHelpReference")</a>
+                }
+            </section>
+            @if (target.Ports.Count > 0)
+            {
+                <section aria-labelledby="node-help-ports">
+                    <h3 id="node-help-ports">@Board.T("NodeHelpPorts")</h3>
+                    <dl>
+                        @foreach (var port in target.Ports.OfType<CanvasPort>())
+                        {
+                            <dt data-node-help-port="@port.Id">@Board.PortName(target, port, details) <code>@port.Id</code></dt>
+                            <dd>@Board.T(port.Spec.Output ? "Output" : "Input") · @Board.T(port.Spec.ResourceKind is null ? port.Spec.Type : "LibraryResourcePort")
+                                @if (port.Spec.Required) { <text> · @Board.T("NodeHelpRequired")</text> }
+                                @if (port.Spec.Help is { } help) { <span>@Board.Label(help, "")</span> }
+                            </dd>
+                        }
+                    </dl>
+                </section>
+            }
+            @if (details.Parameters.Count > 0)
+            {
+                <section aria-labelledby="node-help-parameters">
+                    <h3 id="node-help-parameters">@Board.T("NodeHelpParameters")</h3>
+                    <dl>
+                        @foreach (var field in details.Parameters)
+                        {
+                            <dt data-node-help-parameter="@field.Id">@Board.Label(field.Label, field.Id) <code>@field.Id</code></dt>
+                            <dd><span><code>@field.Kind</code></span>
+                                @if (field.Required) { <span>@Board.T("NodeHelpRequired")</span> }
+                                @if (field.Default.ValueKind != JsonValueKind.Undefined)
+                                {
+                                    <span>@Board.T("NodeHelpDefault") <code>@field.Default.GetRawText()</code></span>
+                                }
+                                @if (field.Min is not null || field.Max is not null)
+                                {
+                                    <span>@Board.T("NodeHelpRange") <code>@(field.Min?.ToString() ?? "–") … @(field.Max?.ToString() ?? "–")</code></span>
+                                }
+                                @if (field.Choices is { Count: > 0 } choices)
+                                {
+                                    <span>@Board.T("NodeHelpChoices") @string.Join(" / ", choices.Select(choice =>
+                                                Board.Label(field.ChoiceLabels?.GetValueOrDefault(choice), choice)))</span>
+                                }
+                                @if (field.Help is { } help) { <span>@Board.Label(help, "")</span> }
+                            </dd>
+                        }
+                    </dl>
+                </section>
+            }
+        </div>
+    }
+</dialog>
+
+@code {
+    [Parameter, EditorRequired] public Pages.Home Board { get; set; } = default!;
+    private ElementReference dialog;
+    private CanvasNode? node;
+    private NodeDefinition? definition;
+    private NodeDocumentation? documentation;
+    private bool opening;
+
+    public Task OpenAsync(CanvasNode target, NodeDefinition details)
+    {
+        node = target;
+        definition = details;
+        documentation = details.Documentation ?? StandardNodes.Catalog.Definitions.FirstOrDefault(item =>
+            item.TypeId == details.TypeId && item.Version == details.Version)?.Documentation;
+        opening = true;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!opening)
+            return;
+        opening = false;
+        await Js.InvokeVoidAsync("agentFlow.showModal", dialog);
+    }
+}

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "0.1",
+  "workflowId": "multiple-outputs",
+  "revision": 1,
+  "nodes": [
+    {"id":"input","typeId":"core.text-input","version":1,"config":{"text":"{\"status\":\"ready\",\"release\":42}"}},
+    {"id":"format","typeId":"ai.prompt","version":1,"config":{"text":"Release 42 is ready."}},
+    {"id":"output-summary","typeId":"core.output","version":1,"config":{}},
+    {"id":"output-json","typeId":"core.output","version":1,"config":{}}
+  ],
+  "edges": [
+    {"id":"format-input","source":"input","sourcePort":"text","target":"format","targetPort":"in","kind":"message"},
+    {"id":"summary","source":"format","sourcePort":"text","target":"output-summary","targetPort":"value","kind":"message"},
+    {"id":"json","source":"input","sourcePort":"text","target":"output-json","targetPort":"value","kind":"message"}
+  ],
+  "layout": {
+    "input":{"x":60,"y":190},
+    "format":{"x":330,"y":65},
+    "output-summary":{"x":615,"y":65},
+    "output-json":{"x":615,"y":295}
+  }
+}

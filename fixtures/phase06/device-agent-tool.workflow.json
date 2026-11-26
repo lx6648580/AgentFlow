@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "0.1",
+  "workflowId": "device-agent-tool",
+  "revision": 1,
+  "nodes": [
+    {"id":"input","typeId":"core.text-input","version":1,"config":{"text":"{\"deviceId\":\"pump-01\"}"}},
+    {"id":"agent","typeId":"ai.agent","version":1,"config":{"text":"You must call devices__read_device with deviceId pump-01 now. Use its result to give one short maintenance recommendation in English.","parameters":{"tools":["devices/read_device"]}}},
+    {"id":"model","typeId":"ai.chat-model","version":1,"config":{"text":"mock"}},
+    {"id":"output","typeId":"core.output","version":1,"config":{}}
+  ],
+  "edges": [
+    {"id":"edge-1","source":"input","sourcePort":"text","target":"agent","targetPort":"in","kind":"message"},
+    {"id":"edge-2","source":"agent","sourcePort":"text","target":"output","targetPort":"value","kind":"message"},
+    {"id":"use-model","source":"model","sourcePort":"model","target":"agent","targetPort":"model","kind":"resource"}
+  ],
+  "layout": {
+    "input": {"x":55,"y":145},
+    "agent": {"x":360,"y":145},
+    "model": {"x":75,"y":370},
+    "output": {"x":645,"y":145}
+  }
+}

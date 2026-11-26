@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "0.1",
+  "workflowId": "first-run",
+  "revision": 1,
+  "nodes": [
+    {"id":"input","typeId":"core.text-input","version":1,"config":{"text":"  Hello, AgentFlow!  "}},
+    {"id":"trim","typeId":"core.normalize","version":1,"config":{}},
+    {"id":"delay","typeId":"flow.delay","version":1,"config":{"parameters":{"milliseconds":600}}},
+    {"id":"debug","typeId":"core.debug","version":1,"config":{"text":"Inspect the cleaned text"}},
+    {"id":"output","typeId":"core.output","version":1,"config":{}}
+  ],
+  "edges": [
+    {"id":"input-trim","source":"input","sourcePort":"text","target":"trim","targetPort":"in","kind":"message"},
+    {"id":"trim-delay","source":"trim","sourcePort":"text","target":"delay","targetPort":"in","kind":"message"},
+    {"id":"delay-debug","source":"delay","sourcePort":"text","target":"debug","targetPort":"in","kind":"message"},
+    {"id":"debug-output","source":"debug","sourcePort":"text","target":"output","targetPort":"value","kind":"message"}
+  ],
+  "layout": {
+    "input":{"x":45,"y":80}, "trim":{"x":305,"y":80}, "delay":{"x":565,"y":80},
+    "debug":{"x":565,"y":285}, "output":{"x":825,"y":285}
+  }
+}

@@ -1,0 +1,187 @@
+@page "/"
+@using Microsoft.AspNetCore.Components.Sections
+
+<PageTitle>AgentFlow Studio</PageTitle>
+
+<div class="studio" data-culture="@culture">
+    <header class="studio-bar">
+        <div class="brand"><span class="brand-mark" aria-hidden="true">◫</span><h1>AgentFlow Studio</h1></div>
+        <div class="file-actions">
+            <button type="button" @onclick="NewAsync">@T("New")</button>
+            <button type="button" data-open-examples aria-haspopup="dialog" aria-controls="workflow-examples"
+                    disabled="@(document is null)" @onclick="() => examples.OpenAsync()">@T("WorkflowExamples")</button>
+            <label class="file-button">@T("Import")
+                <InputFile aria-label="@T("Import")" OnChange="ImportAsync" accept=".json,application/json" />
+            </label>
+            <MudButton Variant="Variant.Filled" Class="primary" Disabled="@(document is null)" OnClick="ExportAsync">@T("Export")</MudButton>
+            <button type="button" disabled="@(activeTab is null || benchmark)" @onclick="() => SaveFileAsync()">@T("Save")</button>
+            <button type="button" disabled="@(activeTab is null || benchmark)" @onclick="() => SaveFileAsync(true)">@T("SaveAs")</button>
+            <button type="button" class="models-toggle" data-models-toggle aria-haspopup="dialog" aria-controls="model-manager"
+                    disabled="@(document is null || benchmark)" @onclick="OpenModelManagerAsync">@T("ResourceManager")</button>
+        </div>
+        <label class="language">@T("Language")
+            <select data-language value="@preference" @onchange="ChangeLanguageAsync">
+                <option value="auto">@T("Auto")</option>
+                <option value="zh-Hans">简体中文</option>
+                <option value="zh-Hant">繁體中文</option>
+                <option value="en">English</option>
+            </select>
+        </label>
+        <SectionOutlet SectionName="run-toolbar" />
+    </header>
+    <ModelManager @ref="modelManager" Board="this" Culture="@culture" Profiles="ModelProfiles" Available="ModelProfilesAvailable"
+                  Reload="LoadModelProfilesAsync" Saved="UpdateModelProfile" />
+    <NodeHelpDialog @ref="nodeHelp" Board="this" />
+    <WorkflowExamplesDialog @ref="examples" Board="this" />
+
+    @if (document is null)
+    {
+        <p role="status" class="loading">@(notice is null ? T("Loading") : T(notice))</p>
+    }
+    else
+    {
+        <nav class="workflow-tabs" aria-label="@T("Tabs")">
+            @foreach (var tab in tabs)
+            {
+                <div class="workflow-tab @(tab == activeTab && !benchmark ? "current" : "")" data-tab="@tab.Id" @key="tab.Id">
+                    <button class="tab-caption" type="button" aria-current="@(tab == activeTab && !benchmark ? "page" : null)" @onclick="() => SwitchTabAsync(tab)">
+                        @tab.Name @if (tab.Dirty) { <span class="tab-dirty" aria-label="@T("Unsaved")">●</span> }
+                    </button>
+                    <button class="tab-close" type="button" title="@T("Close")" aria-label="@T("Close")" @onclick="() => RequestCloseAsync(tab)">×</button>
+                </div>
+            }
+        </nav>
+        <div class="workspace">
+            <aside class="sidebar">
+                <h2>@T("Workflow")</h2>
+                <span class="workflow-name" title="@document.WorkflowId">@(activeTab is not null && !benchmark ? activeTab.Name : document.WorkflowId)</span>
+                @if (!benchmark && activeTab is { Parent: not null })
+                {
+                    <button type="button" data-publish-subworkflow disabled="@(!activeTab.Dirty)" @onclick="PublishSubworkflowAsync">@T("PublishSubworkflow")</button>
+                }
+                <div class="rule"></div>
+                <button type="button" @onclick="AddAtCenter">@T("Add")</button>
+                <button type="button" @onclick="DeleteSelectionAsync">@T("Delete")</button>
+                <button type="button" @onclick="Fit">@T("Fit")</button>
+                <div class="history-actions">
+                    <button type="button" disabled="@(activeTab?.Undo.Count is not > 0 || benchmark)" @onclick="() => TravelAsync(false)">@T("Undo")</button>
+                    <button type="button" disabled="@(activeTab?.Redo.Count is not > 0 || benchmark)" @onclick="() => TravelAsync(true)">@T("Redo")</button>
+                </div>
+                <div class="rule"></div>
+                <label class="virtual"><input type="checkbox" checked="@virtualization" @onchange="SetVirtualization" /> @T("Virtual")</label>
+                <details>
+                    <summary>@T("Bench")</summary>
+                    <button type="button" data-bench="50" @onclick="() => LoadBenchmark(50, 80)">50 / 80</button>
+                    <button type="button" data-bench="100" @onclick="() => LoadBenchmark(100, 160)">100 / 160</button>
+                </details>
+                <div class="rule"></div>
+                <h2>@T("Library")</h2>
+                <div class="node-library">
+                    @foreach (var key in LibraryGroups)
+                    {
+                        var nodes = catalog.Latest.Where(item => item.ShowInLibrary && LibraryGroup(item.TypeId) == key).ToArray();
+                        if (nodes.Length > 0)
+                        {
+                            <details class="library-group" data-library-group="@key" open @key="key">
+                                <summary>@T(key)</summary>
+                                @foreach (var item in nodes)
+                                {
+                                    <button type="button" data-library="@item.TypeId" draggable="true" title="@Label(item.Help, "")"
+                                            @onclick="() => AddFromLibraryAsync(item.TypeId)">@Label(item.Name, item.TypeId)</button>
+                                }
+                            </details>
+                        }
+                    }
+                </div>
+            </aside>
+            <main class="canvas-host" @ref="canvas" tabindex="0" aria-label="@T("Canvas")"
+                  @onpointerup="CanvasPointerUpAsync" @onkeydown="CanvasKeyAsync">
+                <CascadingValue Value="this" IsFixed>
+                    <CascadingValue Value="diagram" IsFixed @key="diagram">
+                        <DiagramCanvas />
+                    </CascadingValue>
+                </CascadingValue>
+                <div class="selection-box" hidden></div>
+                @if (!benchmark)
+                {
+                    <div class="minimap-wrap" @onpointerup:stopPropagation>
+                        <button type="button" class="minimap-toggle" @onclick="() => showMinimap = !showMinimap" aria-expanded="@showMinimap.ToString().ToLowerInvariant()">@T("Minimap")</button>
+                        @if (showMinimap)
+                        {
+                            <div class="minimap" role="group" aria-label="@T("Minimap")" data-minimap @onclick="MoveFromMinimapAsync">
+                                @foreach (var mark in MapMarks())
+                                {
+                                    <span class="@mark.Kind" style="@mark.Style"></span>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+                @if (searchPoint is not null)
+                {
+                    <div role="dialog" aria-label="@T(contextMenu ? "Context" : "Add")" class="node-search" data-search @onpointerup:stopPropagation>
+                        @if (contextMenu)
+                        {
+                            <button type="button" @onclick="ShowSearch">@T("Add")</button>
+                            <button type="button" @onclick="CopySelection">@T("Copy")</button>
+                            <button type="button" @onclick="PasteAsync">@T("Paste")</button>
+                            <button type="button" @onclick="GroupSelectionAsync">@T("Group")</button>
+                            <button type="button" data-extract-subworkflow @onclick="ExtractSubworkflowAsync">@T("ExtractSubworkflow")</button>
+                            <button type="button" @onclick="UngroupSelectionAsync">@T("Ungroup")</button>
+                            <button type="button" @onclick="() => LockSelectionAsync(true)">@T("Lock")</button>
+                            <button type="button" @onclick="() => LockSelectionAsync(false)">@T("Unlock")</button>
+                            <button type="button" @onclick='() => ModeSelectionAsync("bypass")'>@T("bypass")</button>
+                            <button type="button" @onclick='() => ModeSelectionAsync("disabled")'>@T("disabled")</button>
+                            <button type="button" @onclick="DeleteSelectionAsync">@T("Delete")</button>
+                            <button type="button" @onclick="CloseSearch">@T("Close")</button>
+                        }
+                        else
+                        {
+                        <div class="search-row">
+                            <input @ref="searchInput" aria-label="@T("Search")" placeholder="@T("Search")"
+                                   value="@search" @oninput="ChangeSearch"
+                                   @onkeydown="SearchKeyAsync" />
+                            <button type="button" aria-label="@T("Close")" @onclick="CloseSearch">×</button>
+                        </div>
+                        var results = MatchingTypes();
+                        @foreach (var item in results)
+                        {
+                            <button type="button" data-type="@item.TypeId" class="@(Array.IndexOf(results, item) == searchIndex ? "search-current" : "")"
+                                    @onclick="() => AddAsync(item.TypeId)">@Label(item.Name, item.TypeId)</button>
+                        }
+                        @if (results.Length == 0)
+                        {
+                            <small>@T("EmptySearch")</small>
+                        }
+                        }
+                    </div>
+                }
+            </main>
+            <SectionOutlet SectionName="human-action" />
+        </div>
+        <RunPanel @ref="runPanel" Culture="@culture" Enabled="@(!benchmark && !EditorExercise)" Snapshot="Snapshot"
+                  WorkflowKey="@activeTab?.Id" CanvasChanged="SetCanvasFrame" HasTerminal="@(!benchmark && RunTerminal is not null)"
+                  ScopePath="@RunNavigation().Path" FocusTerminal="FocusRunTerminalAsync" Locate="LocateRunNodeAsync" />
+        <footer class="studio-footer">
+            <span class="footer-counts">
+                <span>@T("Nodes") <strong data-node-count>@diagram.Nodes.Count</strong></span>
+                <span>@T("Links") <strong data-link-count>@(diagram.Links.Count(link => link.IsAttached))</strong></span>
+            </span>
+            @if (benchmark)
+            {
+                <span class="editor-mode">@T("Static")</span>
+            }
+            <span role="status" data-notice>@(protectStoredSession ? T("CatalogDraftError") : notice is null ? T("Tips") : T(notice))</span>
+        </footer>
+        @if (pendingClose is { } closing)
+        {
+            <div class="dialog-backdrop">
+                <div role="alertdialog" aria-modal="true" aria-label="@T("Unsaved")" class="close-dialog">
+                    <p>@T("Unsaved")</p>
+                    <button type="button" @onclick="() => pendingClose = null">@T("Cancel")</button>
+                    <button type="button" @onclick="() => CloseTabAsync(closing)">@T("Discard")</button>
+                </div>
+            </div>
+        }
+    }
+</div>

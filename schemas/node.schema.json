@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AgentFlow node definition",
+  "type": "object",
+  "required": ["typeId", "version", "ports", "parameters"],
+  "properties": {
+    "typeId": { "$ref": "#/$defs/id" },
+    "version": { "type": "integer", "minimum": 1 },
+    "name": { "$ref": "#/$defs/localized" },
+    "help": { "$ref": "#/$defs/localized" },
+    "documentation": {
+      "type": ["object", "null"],
+      "required": ["usage", "mafMapping"],
+      "properties": {
+        "usage": { "$ref": "#/$defs/localized" },
+        "mafMapping": { "$ref": "#/$defs/localized" },
+        "referenceUrl": { "type": ["string", "null"], "format": "uri" }
+      }
+    },
+    "showInLibrary": { "type": "boolean" },
+    "legacyTextParameter": { "type": ["string", "null"] },
+    "ports": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "type"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "type": { "enum": ["String", "Number", "Boolean", "Json", "Model"] },
+          "resourceKind": { "$ref": "#/$defs/id" },
+          "output": { "type": "boolean" },
+          "required": { "type": "boolean" },
+          "maxConnections": { "type": ["integer", "null"], "minimum": 1 },
+          "label": { "$ref": "#/$defs/localized" },
+          "help": { "$ref": "#/$defs/localized" }
+        }
+      }
+    },
+    "parameters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "kind"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "kind": { "enum": ["text", "multiline", "number", "toggle", "choice", "json"] },
+          "label": { "$ref": "#/$defs/localized" },
+          "help": { "$ref": "#/$defs/localized" },
+          "required": { "type": "boolean" },
+          "default": {},
+          "min": { "type": ["number", "null"] },
+          "max": { "type": ["number", "null"] },
+          "integer": { "type": "boolean" },
+          "choices": {
+            "type": ["array", "null"],
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "choiceLabels": {
+            "type": ["object", "null"],
+            "additionalProperties": { "$ref": "#/$defs/localized" }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^\\S+$" },
+    "localized": {
+      "type": ["object", "null"],
+      "properties": {
+        "en": { "type": ["string", "null"] },
+        "hans": { "type": ["string", "null"] },
+        "hant": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

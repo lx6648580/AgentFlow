@@ -1,0 +1,50 @@
+name: Editor verification
+on: [push, pull_request]
+
+jobs:
+  editor:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Build locked solution
+        shell: pwsh
+        run: |
+          if (!(Test-Path -LiteralPath 'docs/Terminology.md')) { throw 'Editor terminology is missing.' }
+          dotnet restore AgentFlow.slnx --locked-mode
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet build AgentFlow.slnx -c Release --no-restore
+      - name: Run editor and MAF regression
+        shell: pwsh
+        run: |
+          $env:AGENTFLOW_BROWSER_CHANNEL = 'chromium'
+          pwsh -NoProfile -File tests/AgentFlow.Phase00.Tests/bin/Release/net10.0/playwright.ps1 install chromium
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:AGENTFLOW_NODE_PLUGINS = (Resolve-Path 'examples/AgentFlow.SampleNodes/bin/Release/net10.0/AgentFlow.SampleNodes.dll').Path
+          $env:AGENTFLOW_MODEL_KEY_PHASE03_TEST = 'phase03-credential-regression-871108'
+          $env:AGENTFLOW_RUN_DATA = Join-Path $env:RUNNER_TEMP 'agentflow-run-data'
+          $env:AGENTFLOW_SIMULATED_WRITES = '1'
+          $env:AGENTFLOW_SAMPLE_DATA = Join-Path $env:RUNNER_TEMP 'agentflow-device-data'
+          $env:AGENTFLOW_TOOL_ROOT = $env:AGENTFLOW_SAMPLE_DATA
+          $env:AGENTFLOW_TOOLS_CONFIG = (Resolve-Path 'examples/AgentFlow.DeviceSample/tools.demo.json').Path
+          $device = Start-Process dotnet -ArgumentList @('examples/AgentFlow.DeviceSample/bin/Release/net10.0/AgentFlow.DeviceSample.dll','--urls','http://127.0.0.1:5190') -WindowStyle Hidden -PassThru
+          $catalog = Start-Process dotnet -ArgumentList @('src/AgentFlow.NodeHost/bin/Release/net10.0/AgentFlow.NodeHost.dll','--urls','http://127.0.0.1:5188') -WindowStyle Hidden -PassThru
+          $server = Start-Process dotnet -ArgumentList @('run','--project','poc/AgentFlow.Editor.POC','-c','Release','--no-build','--no-restore','--no-launch-profile','--urls','http://127.0.0.1:5187') -WindowStyle Hidden -PassThru
+          try {
+            $ready = $false
+            for ($attempt = 0; $attempt -lt 25; $attempt++) {
+              try {
+                $ready = (Invoke-WebRequest 'http://127.0.0.1:5187/' -TimeoutSec 2).StatusCode -eq 200 -and
+                  (Invoke-WebRequest 'http://127.0.0.1:5188/api/nodes' -TimeoutSec 2).StatusCode -eq 200 -and
+                  (Invoke-WebRequest 'http://127.0.0.1:5190/health' -TimeoutSec 2).StatusCode -eq 200
+              }
+              catch { Start-Sleep -Seconds 1 }
+              if ($ready) { break }
+            }
+            if (!$ready) { throw 'Editor host did not start.' }
+            dotnet test AgentFlow.slnx -c Release --no-build --no-restore --filter 'Category!=Benchmark&Category!=LiveModel'
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          finally { Stop-Process -Id $server.Id,$catalog.Id,$device.Id -ErrorAction SilentlyContinue }

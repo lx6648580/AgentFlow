@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "0.1",
+  "workflowId": "score-review",
+  "revision": 1,
+  "nodes": [
+    {"id":"input","typeId":"core.text-input","version":1,"config":{"text":"{\"review\":{\"score\":82,\"note\":\"Validated\"}}"}},
+    {"id":"select","typeId":"data.json-mapper","version":1,"config":{"parameters":{"fields":{"score":"/review/score"}}}},
+    {"id":"structure","typeId":"data.structured-output","version":1,"config":{"parameters":{"schema":{"type":"object","properties":{"score":{"type":"number"}},"required":["score"],"additionalProperties":false}}}},
+    {"id":"decision","typeId":"flow.condition","version":1,"config":{"text":"/score >= 80"}},
+    {"id":"approve","typeId":"ai.prompt","version":1,"config":{"text":"approved"}},
+    {"id":"reject","typeId":"ai.prompt","version":1,"config":{"text":"manual-review"}},
+    {"id":"merge","typeId":"flow.merge","version":1,"config":{"parameters":{"mode":"any"}}},
+    {"id":"output","typeId":"core.output","version":1,"config":{}}
+  ],
+  "edges": [
+    {"id":"edge-1","source":"input","sourcePort":"text","target":"select","targetPort":"in","kind":"message"},
+    {"id":"edge-2","source":"select","sourcePort":"text","target":"structure","targetPort":"in","kind":"message"},
+    {"id":"edge-3","source":"structure","sourcePort":"text","target":"decision","targetPort":"in","kind":"message"},
+    {"id":"edge-4","source":"decision","sourcePort":"yes","target":"approve","targetPort":"in","kind":"message"},
+    {"id":"edge-5","source":"decision","sourcePort":"no","target":"reject","targetPort":"in","kind":"message"},
+    {"id":"edge-6","source":"approve","sourcePort":"text","target":"merge","targetPort":"a","kind":"message"},
+    {"id":"edge-7","source":"reject","sourcePort":"text","target":"merge","targetPort":"b","kind":"message"},
+    {"id":"edge-8","source":"merge","sourcePort":"text","target":"output","targetPort":"value","kind":"message"}
+  ],
+  "layout": {
+    "input": {"x":55,"y":125},
+    "select": {"x":335,"y":125},
+    "structure": {"x":615,"y":125},
+    "decision": {"x":895,"y":125},
+    "approve": {"x":1175,"y":55},
+    "reject": {"x":1175,"y":290},
+    "merge": {"x":1455,"y":150},
+    "output": {"x":1735,"y":150}
+  }
+}

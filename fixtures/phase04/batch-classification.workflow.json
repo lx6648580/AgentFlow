@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "0.1",
+  "workflowId": "batch-classification",
+  "revision": 1,
+  "limits": {"maxSteps":100,"maxSeconds":90},
+  "nodes": [
+    {"id":"input","typeId":"core.text-input","version":1,"config":{"text":"[\"praise\",\"technology\",\"feedback\"]"}},
+    {"id":"controller","typeId":"flow.for-each","version":1,"config":{"parameters":{"items":8}}},
+    {"id":"prompt","typeId":"ai.prompt","version":1,"config":{"text":"Classify: {{input}}"}},
+    {"id":"agent","typeId":"ai.agent","version":1,"config":{"text":"Classify this item and return one label."}},
+    {"id":"model","typeId":"ai.chat-model","version":1,"config":{"text":"mock"}},
+    {"id":"output","typeId":"core.output","version":1,"config":{}}
+  ],
+  "edges": [
+    {"id":"edge-1","source":"input","sourcePort":"text","target":"controller","targetPort":"in","kind":"message"},
+    {"id":"edge-2","source":"controller","sourcePort":"body","target":"prompt","targetPort":"in","kind":"message"},
+    {"id":"edge-3","source":"prompt","sourcePort":"text","target":"agent","targetPort":"in","kind":"message"},
+    {"id":"edge-4","source":"model","sourcePort":"model","target":"agent","targetPort":"model","kind":"resource"},
+    {"id":"edge-5","source":"agent","sourcePort":"text","target":"controller","targetPort":"feedback","kind":"message"},
+    {"id":"edge-6","source":"controller","sourcePort":"done","target":"output","targetPort":"value","kind":"message"}
+  ],
+  "layout": {
+    "input": {"x":55,"y":140},
+    "controller": {"x":335,"y":140},
+    "prompt": {"x":615,"y":300},
+    "agent": {"x":895,"y":300},
+    "model": {"x":615,"y":515},
+    "output": {"x":615,"y":90}
+  }
+}

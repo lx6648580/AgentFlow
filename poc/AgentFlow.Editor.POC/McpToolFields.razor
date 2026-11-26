@@ -1,0 +1,27 @@
+<div class="node-form" @onpointerdown:stopPropagation @onkeydown:stopPropagation @onwheel:stopPropagation>
+    <label class="node-parameter">
+        <span class="config-label">@Board.T("ChooseMcpTool")</span>
+        <select data-mcp-reference value="@Reference" @onchange="e => Board.SelectMcpToolAsync(Node, e.Value?.ToString() ?? string.Empty)">
+            <option value="" disabled>@Board.T("NoSelection")</option>
+            @if (Reference.Length > 0 && !Board.McpToolOptions.Contains(Reference, StringComparer.Ordinal))
+            {
+                <option value="@Reference">@Reference · @Board.T("McpProfileUnavailable")</option>
+            }
+            @foreach (var option in Board.McpToolOptions)
+            {
+                <option value="@option">@option</option>
+            }
+        </select>
+    </label>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Pages.Home Board { get; set; } = default!;
+    [Parameter, EditorRequired] public CanvasNode Node { get; set; } = default!;
+    private string Reference => Text("server") is { Length: > 0 } server && Text("tool") is { Length: > 0 } tool ? $"{server}/{tool}" : "";
+    private string Text(string id)
+    {
+        var definition = Board.Definition(Node.Definition);
+        return Pages.Home.ParameterText(NodeValidator.ReadValue(definition, definition.Parameters.Single(field => field.Id == id), Node.Definition.Config));
+    }
+}

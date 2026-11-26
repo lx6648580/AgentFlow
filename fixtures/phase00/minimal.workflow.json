@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "0.1",
+  "workflowId": "phase00-trim",
+  "revision": 1,
+  "nodes": [
+    { "id": "input", "typeId": "core.text-input", "version": 1, "config": { "text": "  Workflow  " } },
+    { "id": "normalize", "typeId": "core.normalize", "version": 1, "config": {} },
+    { "id": "output", "typeId": "core.output", "version": 1, "config": {} }
+  ],
+  "edges": [
+    { "id": "e1", "source": "input", "sourcePort": "text", "target": "normalize", "targetPort": "in", "kind": "message" },
+    { "id": "e2", "source": "normalize", "sourcePort": "text", "target": "output", "targetPort": "value", "kind": "message" }
+  ],
+  "layout": {
+    "input": { "x": 85, "y": 220 },
+    "normalize": { "x": 405, "y": 220 },
+    "output": { "x": 725, "y": 220 }
+  }
+}

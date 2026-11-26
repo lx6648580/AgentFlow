@@ -1,0 +1,187 @@
+@using Microsoft.AspNetCore.Components.Sections
+
+<SectionContent SectionName="run-toolbar">
+    @if (HasTerminal)
+    {
+        <div class="toolbar-run" role="group" aria-label="@T("RunTerminal")">
+            <button type="button" data-run-focus @onclick="() => FocusTerminal.InvokeAsync()">@T("RunTerminal")</button>
+            <button type="button" data-run-queue aria-controls="run-diagnostics" disabled="@(http is null)" @onclick="OpenQueueAsync">@T("RunQueue")</button>
+            <button type="button" data-run-inspector aria-controls="run-diagnostics" aria-expanded="@Flag(inspectorOpen)"
+                    disabled="@(http is null)" @onclick="ToggleInspectorAsync">@T("RunHistory")</button>
+        </div>
+    }
+    else
+    {
+    <div class="toolbar-run" role="group" aria-label="@T("RunPanel")">
+        <button type="button" data-run-start class="run-primary" disabled="@(!Enabled || submitting || Active)" @onclick="StartAsync">
+            @T(pending is null ? "RunWorkflow" : "RetryRun")
+        </button>
+        <button type="button" data-run-cancel disabled="@(!Enabled || !Active || current?.State == "Cancelling" || cancelling)" @onclick="CancelAsync">@T("StopRun")</button>
+        <button type="button" data-run-queue aria-controls="run-diagnostics" disabled="@(!Enabled || http is null)"
+                @onclick="OpenQueueAsync">@T("RunQueue")</button>
+        <button type="button" data-run-inspector aria-controls="run-diagnostics" aria-expanded="@Flag(inspectorOpen)"
+                disabled="@(!Enabled || http is null)" @onclick="ToggleInspectorAsync">@T("RunInspector")</button>
+        <button type="button" data-debug-options aria-expanded="@Flag(Enabled && debugOptions)"
+                disabled="@(!Enabled)" @onclick="() => debugOptions = !debugOptions">@T("DebugOptions")</button>
+        @if (Enabled && debugOptions)
+        {
+            <fieldset class="run-debug-options" disabled="@(Active || submitting)">
+                <label><input type="checkbox" data-debug-pause @bind="pauseAtStart" /> @T("PauseAtStart")</label>
+                <label>@T("BreakpointNode")
+                    <select data-debug-breakpoint @bind="breakpointNode">
+                        <option value="">@T("NoSelection")</option>
+                        @foreach (var node in DebugNodes())
+                        {
+                            <option value="@node.Id">@node.Id</option>
+                        }
+                    </select>
+                </label>
+                <label>@T("StopAfterNode")
+                    <select data-debug-stop @bind="stopAfterNode">
+                        <option value="">@T("NoSelection")</option>
+                        @foreach (var node in DebugNodes())
+                        {
+                            <option value="@node.Id">@node.Id</option>
+                        }
+                    </select>
+                </label>
+                <label><input type="checkbox" data-debug-cache @bind="usePureCache" /> @T("UsePureCache")</label>
+            </fieldset>
+        }
+        @if (Enabled && current is { State: "Paused" } paused)
+        {
+            <div class="run-actions run-control">
+                <button type="button" data-run-continue disabled="@controlling" @onclick='() => ControlAsync("continue")'>@T("ContinueRun")</button>
+                <button type="button" data-run-batch disabled="@controlling" @onclick='() => ControlAsync("stepBatch")'>@T("StepBatch")</button>
+                @if (paused.CanStepNode)
+                {
+                    <button type="button" data-run-step disabled="@controlling" @onclick='() => ControlAsync("stepNode")'>@T("StepNode")</button>
+                }
+            </div>
+        }
+    </div>
+    }
+</SectionContent>
+
+@if (HasTerminal)
+{
+    <SectionContent SectionName="run-terminal">
+        <div class="terminal-player" role="group" aria-label="@T("RunTerminal")">
+            <button type="button" class="run-primary" data-run-start disabled="@(!PlayerReady || Active)" @onclick="StartAsync">
+                @T(pending is not null ? "RetryRun" : current is null ? "PlayRun" : "Rerun")
+            </button>
+            <button type="button" data-run-pause disabled="@(!PlayerReady || controlling || current?.CanPause != true || current.PauseRequested)"
+                    @onclick='() => ControlAsync("pause")'>@T(current?.PauseRequested == true ? "PauseRequested" : "PauseRun")</button>
+            <button type="button" data-run-continue disabled="@(!PlayerReady || controlling || current?.State != "Paused")"
+                    @onclick='() => ControlAsync("continue")'>@T("ContinueRun")</button>
+            <button type="button" data-run-step disabled="@(!PlayerReady || controlling ||
+                (Active ? current?.State != "Paused" : !InteractiveAvailable))"
+                    @onclick="StepAsync">@T(current is { State: "Paused", CanStepNode: false } ? "StepBatch" : "StepRun")</button>
+            <button type="button" data-run-cancel disabled="@(viewingHistory || !Active || current?.State == "Cancelling" || cancelling)"
+                    @onclick="CancelAsync">@T("StopRun")</button>
+        </div>
+        @if (ScopePath.Length > 0)
+        {
+            <small class="terminal-scope">@T("TerminalSubflow") · @ScopePath</small>
+        }
+        else if (!InteractiveAvailable)
+        {
+            <small class="terminal-scope">@T("RunInteractiveUnavailable")</small>
+        }
+        @if (!viewingHistory) { @StatusContent }
+        <SectionOutlet SectionName="run-terminal-timeline" />
+    </SectionContent>
+    @if (http is not null)
+    {
+        <RunInspector @key="currentId" @ref="inspector" Api="http" Culture="@Culture" Live="LiveRecording" Visible="true"
+                      Terminal="true" ScopePath="@ScopePath" CanvasChanged="CanvasChanged" HistoryChanged="SetHistoryView" Locate="Locate" />
+    }
+}
+
+<SectionContent SectionName="human-action">
+    @if (Enabled && current is { State: "Waiting", Waiting: { } wait })
+    {
+        <aside class="run-panel run-result human-wait" data-human-wait aria-labelledby="human-wait-title">
+            <h3 id="human-wait-title">@T(wait.Kind == "approval" ? "ApprovalSample" : "HumanInputSample")</h3>
+            <p data-human-prompt>@wait.Prompt</p>
+            <dl>
+                <dt>@T("HumanAssignee")</dt><dd data-human-assignee>@wait.Assignee</dd>
+                <dt>@T("HumanDeadline")</dt><dd><time datetime="@wait.ExpiresAt.ToString("O")">@wait.ExpiresAt.ToLocalTime().ToString("g")</time></dd>
+            </dl>
+            @if (wait.Preview.Length > 0)
+            {
+                <pre aria-label="@T("HumanData")" tabindex="0">@wait.Preview</pre>
+            }
+            <label>@T("HumanActor") <input data-human-actor autocomplete="off" maxlength="128" @bind="decisionActor" @bind:event="oninput" /></label>
+            @if (wait.Kind == "input")
+            {
+                <label>@T("HumanResponse") <textarea data-human-value rows="3" maxlength="4000" @bind="decisionValue" @bind:event="oninput"></textarea></label>
+            }
+            <div class="run-actions">
+                @if (wait.Kind == "approval")
+                {
+                    <button type="button" class="run-primary" data-human-approve disabled="@(deciding || string.IsNullOrWhiteSpace(decisionActor))"
+                            @onclick='() => DecideAsync("approve")'>@T("HumanApprove")</button>
+                }
+                else
+                {
+                    <button type="button" class="run-primary" data-human-submit
+                            disabled="@(deciding || string.IsNullOrWhiteSpace(decisionActor) || string.IsNullOrWhiteSpace(decisionValue))"
+                            @onclick='() => DecideAsync("submit")'>@T("HumanSubmit")</button>
+                }
+                <button type="button" data-human-reject disabled="@(deciding || string.IsNullOrWhiteSpace(decisionActor))"
+                        @onclick='() => DecideAsync("reject")'>@T("HumanReject")</button>
+            </div>
+        </aside>
+    }
+
+</SectionContent>
+
+<section id="run-diagnostics" class="run-dock" aria-label="@T("RunInspector")"
+         hidden="@(!Enabled || (HasTerminal ? !inspectorOpen : current is null && runError is null && !inspectorOpen))">
+    @if (HasTerminal)
+    {
+        <SectionOutlet SectionName="run-records" />
+    }
+    else
+    {
+        @StatusContent
+        @if (http is not null)
+        {
+            <div class="run-dock-content" hidden="@(!inspectorOpen)">
+                <RunInspector @key="currentId" @ref="inspector" Api="http" Culture="@Culture" Live="LiveRecording" Visible="inspectorOpen"
+                              CanvasChanged="CanvasChanged" Locate="Locate" />
+            </div>
+        }
+    }
+</section>
+
+@code {
+    private RenderFragment StatusContent => @<div class="terminal-status">
+    @if (current is { } run)
+    {
+        <div class="run-record-strip">
+            <strong role="status" class="run-state" data-run-state="@run.State">@T(run.State)</strong>
+            @if (run.PauseRequested)
+            {
+                <span role="status" data-pause-requested>@T("PauseRequested")</span>
+            }
+            <span>RunId <code data-run-id>@run.RunId</code></span>
+            <span>@run.WorkflowId · r@(run.Revision)</span>
+            @if (!string.IsNullOrEmpty(run.ProfileId))
+            {
+                <span>@T("ProfileId") <span data-run-profile>@run.ProfileId</span></span>
+            }
+            <span>@T("Tokens") <span data-run-usage>@(run.Usage?.TotalTokens?.ToString() ?? T("UnknownUsage"))</span></span>
+        </div>
+        @if (run.Error is not null)
+        {
+            <p role="alert" data-run-failure="@run.Error">@T(UiText.Keys.Contains(run.Error) ? run.Error : "ExecutionFailed")</p>
+        }
+    }
+    @if (runError is not null)
+    {
+        <p role="alert" data-run-error>@T(runError) @runErrorNode</p>
+    }
+    </div>;
+}

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "0.1",
+  "workflowId": "editor-ports",
+  "revision": 1,
+  "nodes": [
+    {"id":"input","typeId":"core.text-input","version":1,"config":{"text":"Try the String and Number ports"}},
+    {"id":"probe","typeId":"poc.port-probe","version":1,"config":{"ports":2}}
+  ],
+  "edges": [
+    {"id":"text-to-probe","source":"input","sourcePort":"text","target":"probe","targetPort":"text-1","kind":"message"}
+  ],
+  "layout": {
+    "input":{"x":55,"y":65}, "probe":{"x":375,"y":65}
+  }
+}

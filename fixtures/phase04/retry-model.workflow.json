@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "0.1",
+  "workflowId": "retry-model",
+  "revision": 1,
+  "limits": {"maxSteps":32,"maxSeconds":60},
+  "nodes": [
+    {"id":"input","typeId":"core.text-input","version":1,"config":{"text":"Confirm that the model service is ready."}},
+    {"id":"retry","typeId":"ai.retry","version":1,"config":{"text":"Reply with READY.","parameters":{"attempts":3,"milliseconds":40}}},
+    {"id":"model","typeId":"ai.chat-model","version":1,"config":{"text":"mock"}},
+    {"id":"output","typeId":"core.output","version":1,"config":{}}
+  ],
+  "edges": [
+    {"id":"edge-1","source":"input","sourcePort":"text","target":"retry","targetPort":"in","kind":"message"},
+    {"id":"edge-2","source":"model","sourcePort":"model","target":"retry","targetPort":"model","kind":"resource"},
+    {"id":"edge-3","source":"retry","sourcePort":"text","target":"output","targetPort":"value","kind":"message"}
+  ],
+  "layout": {
+    "input": {"x":55,"y":125},
+    "retry": {"x":335,"y":125},
+    "model": {"x":55,"y":355},
+    "output": {"x":615,"y":125}
+  }
+}

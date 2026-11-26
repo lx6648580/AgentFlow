@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "0.1",
+  "workflowId": "parallel-review",
+  "revision": 1,
+  "nodes": [
+    {"id":"input","typeId":"core.text-input","version":1,"config":{"text":"Review the new workflow scheduler."}},
+    {"id":"fanout","typeId":"flow.parallel","version":1,"config":{}},
+    {"id":"prompt-reliability","typeId":"ai.prompt","version":1,"config":{"text":"Reliability: {{input}}"}},
+    {"id":"reliability","typeId":"ai.agent","version":1,"config":{"text":"Review the reliability dimension. Give one finding."}},
+    {"id":"prompt-performance","typeId":"ai.prompt","version":1,"config":{"text":"Performance: {{input}}"}},
+    {"id":"performance","typeId":"ai.agent","version":1,"config":{"text":"Review the performance dimension. Give one finding."}},
+    {"id":"prompt-maintenance","typeId":"ai.prompt","version":1,"config":{"text":"Maintenance: {{input}}"}},
+    {"id":"maintenance","typeId":"ai.agent","version":1,"config":{"text":"Review the maintenance dimension. Give one finding."}},
+    {"id":"model","typeId":"ai.chat-model","version":1,"config":{"text":"mock"}},
+    {"id":"merge","typeId":"flow.merge","version":1,"config":{"text":"json"}},
+    {"id":"output","typeId":"core.output","version":1,"config":{}}
+  ],
+  "edges": [
+    {"id":"edge-1","source":"input","sourcePort":"text","target":"fanout","targetPort":"in","kind":"message"},
+    {"id":"edge-2","source":"fanout","sourcePort":"a","target":"prompt-reliability","targetPort":"in","kind":"message"},
+    {"id":"edge-3","source":"prompt-reliability","sourcePort":"text","target":"reliability","targetPort":"in","kind":"message"},
+    {"id":"edge-4","source":"model","sourcePort":"model","target":"reliability","targetPort":"model","kind":"resource"},
+    {"id":"edge-5","source":"reliability","sourcePort":"text","target":"merge","targetPort":"a","kind":"message"},
+    {"id":"edge-6","source":"fanout","sourcePort":"b","target":"prompt-performance","targetPort":"in","kind":"message"},
+    {"id":"edge-7","source":"prompt-performance","sourcePort":"text","target":"performance","targetPort":"in","kind":"message"},
+    {"id":"edge-8","source":"model","sourcePort":"model","target":"performance","targetPort":"model","kind":"resource"},
+    {"id":"edge-9","source":"performance","sourcePort":"text","target":"merge","targetPort":"b","kind":"message"},
+    {"id":"edge-10","source":"fanout","sourcePort":"c","target":"prompt-maintenance","targetPort":"in","kind":"message"},
+    {"id":"edge-11","source":"prompt-maintenance","sourcePort":"text","target":"maintenance","targetPort":"in","kind":"message"},
+    {"id":"edge-12","source":"model","sourcePort":"model","target":"maintenance","targetPort":"model","kind":"resource"},
+    {"id":"edge-13","source":"maintenance","sourcePort":"text","target":"merge","targetPort":"c","kind":"message"},
+    {"id":"edge-14","source":"merge","sourcePort":"text","target":"output","targetPort":"value","kind":"message"}
+  ],
+  "layout": {
+    "input": {"x":55,"y":125},
+    "fanout": {"x":335,"y":125},
+    "prompt-reliability": {"x":615,"y":55},
+    "reliability": {"x":895,"y":55},
+    "prompt-performance": {"x":615,"y":250},
+    "performance": {"x":895,"y":250},
+    "prompt-maintenance": {"x":615,"y":445},
+    "maintenance": {"x":895,"y":445},
+    "model": {"x":335,"y":400},
+    "merge": {"x":1175,"y":190},
+    "output": {"x":1455,"y":190}
+  }
+}

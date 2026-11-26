@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "0.1",
+  "workflowId": "review-editor-example",
+  "revision": 1,
+  "nodes": [
+    { "id": "input", "typeId": "core.text-input", "version": 1, "config": { "text": "Review the draft" } },
+    { "id": "model", "typeId": "ai.chat-model", "version": 1, "config": { "text": "local-review-model" } },
+    { "id": "prompt", "typeId": "ai.prompt", "version": 1, "config": { "text": "Summarize the review questions." } },
+    { "id": "agent", "typeId": "ai.agent", "version": 1, "config": { "text": "Review the supplied text." } },
+    { "id": "condition", "typeId": "flow.condition", "version": 1, "config": { "text": "review accepted" } },
+    { "id": "parallel", "typeId": "flow.parallel", "version": 1, "config": { "text": "Summary, Follow-up" } },
+    { "id": "merge", "typeId": "flow.merge", "version": 1, "config": { "text": "combine" } },
+    { "id": "debug", "typeId": "core.debug", "version": 1, "config": { "text": "Rejected review" } },
+    { "id": "output", "typeId": "core.output", "version": 1, "config": {} }
+  ],
+  "edges": [
+    { "id": "e1", "source": "input", "sourcePort": "text", "target": "prompt", "targetPort": "in", "kind": "message" },
+    { "id": "e2", "source": "prompt", "sourcePort": "text", "target": "agent", "targetPort": "in", "kind": "message" },
+    { "id": "e3", "source": "model", "sourcePort": "model", "target": "agent", "targetPort": "model", "kind": "resource" },
+    { "id": "e4", "source": "agent", "sourcePort": "text", "target": "condition", "targetPort": "in", "kind": "message" },
+    { "id": "e5", "source": "condition", "sourcePort": "yes", "target": "parallel", "targetPort": "in", "kind": "message" },
+    { "id": "e6", "source": "condition", "sourcePort": "no", "target": "debug", "targetPort": "in", "kind": "message" },
+    { "id": "e7", "source": "parallel", "sourcePort": "a", "target": "merge", "targetPort": "a", "kind": "message" },
+    { "id": "e8", "source": "parallel", "sourcePort": "b", "target": "merge", "targetPort": "b", "kind": "message" },
+    { "id": "e9", "source": "merge", "sourcePort": "text", "target": "output", "targetPort": "value", "kind": "message" }
+  ],
+  "layout": {
+    "input": { "x": 70, "y": 150 },
+    "model": { "x": 380, "y": 365 },
+    "prompt": { "x": 380, "y": 150 },
+    "agent": { "x": 690, "y": 150 },
+    "condition": { "x": 1000, "y": 150 },
+    "parallel": { "x": 1310, "y": 85 },
+    "merge": { "x": 1620, "y": 85 },
+    "debug": { "x": 1310, "y": 385 },
+    "output": { "x": 1930, "y": 85 }
+  },
+  "groups": [
+    { "id": "review-inputs", "title": "Review inputs", "nodes": ["input", "model", "prompt"] }
+  ]
+}

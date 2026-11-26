@@ -1,0 +1,270 @@
+@using System.Text.Json
+@using Microsoft.AspNetCore.Components.Sections
+
+@if (Terminal)
+{
+    <SectionContent SectionName="run-terminal-timeline">@TraceContent</SectionContent>
+}
+else
+{
+    @TraceContent
+}
+
+@code {
+    private RenderFragment TraceContent => @<section class="run-inspector" aria-label="@T("RunInspector")">
+    @if (!Terminal)
+    {
+    <nav class="trace-tabs" aria-label="@T("RunInspector")">
+        <button type="button" data-trace-tab="timeline" aria-pressed="@TabPressed("timeline")" @onclick='() => OpenTabAsync("timeline")'>@T("Timeline")</button>
+        <button type="button" data-trace-tab="queue" aria-pressed="@TabPressed("queue")" @onclick='() => OpenTabAsync("queue")'>@T("RunQueue")</button>
+        <button type="button" data-trace-tab="history" aria-pressed="@TabPressed("history")" @onclick='() => OpenTabAsync("history")'>@T("RunHistory")</button>
+    </nav>
+    }
+    @if (error is not null)
+    {
+        <p role="alert">@T(error)</p>
+    }
+    @if (!Terminal && tab != "timeline")
+    {
+        @RunList
+    }
+    else if (Recording is { } recording)
+    {
+        <div class="trace-summary">
+            <strong data-trace-mode>@T(historical is null ? "FollowCurrent" : "HistoricalLog")</strong>
+            @if (Terminal && historical is not null)
+            {
+                <strong data-terminal-history-state>@T(recording.Snapshot.State)</strong>
+            }
+            @if (!Terminal || historical is not null)
+            {
+                <span data-trace-run>@recording.Snapshot.RunId</span>
+            }
+            <div class="run-actions">
+                @if (historical is not null)
+                {
+                    <button type="button" data-trace-live @onclick="FollowAsync">@T("ReturnToLive")</button>
+                }
+                @if (!Terminal)
+                {
+                    <button type="button" data-trace-export disabled="@busy" @onclick="ExportAsync">@T("ExportDiagnostics")</button>
+                }
+            </div>
+        </div>
+        @if (!Terminal && OutputReferences(recording).ToArray() is { Length: > 0 } references)
+        {
+            <div class="run-output-references" data-run-output-references>
+                <strong>@T("OutputReferences")</strong>
+                @foreach (var (id, artifact) in references)
+                {
+                    <button type="button" data-output-reference="@id" title="@(artifact?.ToString() ?? T("InlineOutputRef"))"
+                            @onclick="() => InspectNodeAsync(id)">@id · @T(artifact is null ? "InlineOutputRef" : "ArtifactOutputRef")</button>
+                }
+            </div>
+        }
+        @if (recording.Events is [{ Sequence: > 1 }, ..])
+        {
+            <p role="status">@T("TraceWindow")</p>
+        }
+        @if (Terminal)
+        {
+            @LogFilter
+            @Console(recording)
+            @if (Events.FirstOrDefault(item => item.Sequence == selectedSequence && InScope(item.NodeId)) is { } activity)
+            {
+                <section class="terminal-event-detail" aria-label="@T(activity.Kind)" data-console-detail="@activity.Kind">
+                    <p>@ConsoleLine(recording, activity)</p>
+                    @if (activity.Text is { } text) { <pre tabindex="0">@T(text)</pre> }
+                    @if (activity.Usage is { } usage)
+                    {
+                        <p>@T("Tokens") @(usage.TotalTokens?.ToString() ?? T("UnknownUsage"))</p>
+                    }
+                    @if (activity.Value is { } value)
+                    {
+                        <pre tabindex="0" data-trace-value="@activity.Kind">@FullValue(value)</pre>
+                        @if (value.ArtifactId is { } id && !artifacts.ContainsKey(id))
+                        {
+                            <button type="button" data-trace-artifact disabled="@busy" @onclick="() => LoadArtifactAsync(id)">@T("LoadArtifact") · @value.Length</button>
+                        }
+                        else if (value.Truncated)
+                        {
+                            <p>@T("ArtifactTruncated") · @value.Length</p>
+                        }
+                    }
+                </section>
+            }
+        }
+        else
+        {
+        <div class="trace-workspace">
+            <div class="trace-events">
+                @LogFilter
+                <ol class="trace-list timeline-list" data-timeline>
+                    @foreach (var item in FilteredEvents().TakeLast(120))
+                    {
+                        <li @key="item.Sequence">
+                            <button type="button" data-trace-event="@item.Sequence" data-trace-event-kind="@item.Kind"
+                                    data-trace-node="@item.NodeId" aria-current="@(selectedSequence == item.Sequence ? "true" : null)"
+                                    @onclick="() => SelectEventAsync(item)">
+                                <strong>@T(item.Kind) @item.NodeId</strong>
+                                <span>+@((item.At - recording.Snapshot.CreatedAt).TotalMilliseconds.ToString("F0")) ms
+                                    @if (item.DurationMs is { } elapsed) { <text> · @elapsed.ToString("F0") ms</text> }
+                                    @if (item.Batch is { } batch) { <text> · @T("BatchEvents") @(batch + 1)</text> }
+                                    @if (item.IterationId is not null) { <text> · @item.IterationId</text> }
+                                </span>
+                            </button>
+                        </li>
+                    }
+                </ol>
+            </div>
+            @NodeDetails(recording)
+        </div>
+        }
+    }
+    else if (Terminal)
+    {
+        @Console(null)
+    }
+    else
+    {
+        <p role="status">@T("NoRuns")</p>
+    }
+</section>;
+
+    private RenderFragment LogFilter => @<div class="trace-query">
+        <input data-trace-query aria-label="@T("TraceQuery")" placeholder="@T("TraceQuery")" @bind="logQuery" @bind:event="oninput" />
+        <select data-trace-kind aria-label="@T("TraceType")" @bind="kind">
+            <option value="">@T("AllEvents")</option>
+            <option value="nodes">@T("Nodes")</option>
+            <option value="models">@T("Model")</option>
+            <option value="tools">@T("ToolEvents")</option>
+            <option value="errors">@T("TraceErrors")</option>
+            <option value="batch">@T("BatchEvents")</option>
+        </select>
+    </div>;
+
+    private RenderFragment Console(RunRecording? recording) => @<agentflow-log @key="(recording?.Snapshot.RunId, historical is not null)"
+            data-run-console data-timeline role="log" tabindex="0" aria-label="@T("RunLog")"
+            aria-live="@(historical is null ? "polite" : "off")" data-follow="@(historical is null ? "true" : "false")">
+        @if (recording is not null && FilteredEvents().TakeLast(120).ToArray() is { Length: > 0 } lines)
+        {
+            @foreach (var item in lines)
+            {
+                <button @key="item.Sequence" type="button" data-trace-event="@item.Sequence" data-trace-event-kind="@item.Kind"
+                        data-trace-node="@item.NodeId" aria-current="@(selectedSequence == item.Sequence ? "true" : null)"
+                        @onclick="() => SelectEventAsync(item)">@ConsoleLine(recording, item)</button>
+            }
+        }
+        else
+        {
+            <span>@T(Events.Count == 0 ? "WaitingForEvents" : "NoMatchingEvents")</span>
+        }
+    </agentflow-log>;
+}
+
+@if (Terminal)
+{
+    <SectionContent SectionName="run-records">
+        <div class="terminal-records">
+            <nav class="trace-tabs" aria-label="@T("RunHistory")">
+                <button type="button" data-trace-tab="queue" aria-pressed="@TabPressed("queue")" @onclick='() => OpenTabAsync("queue")'>@T("RunQueue")</button>
+                <button type="button" data-trace-tab="history" aria-pressed="@TabPressed("history")" @onclick='() => OpenTabAsync("history")'>@T("RunHistory")</button>
+                <button type="button" data-trace-export disabled="@(busy || Recording is null)" @onclick="ExportAsync">@T("ExportDiagnostics")</button>
+            </nav>
+            @if (tab != "timeline") { @RunList }
+        </div>
+    </SectionContent>
+}
+
+@code {
+    private RenderFragment RunList => @<div>
+        <form class="trace-query" @onsubmit="LoadRunsAsync" @onsubmit:preventDefault>
+            <input data-run-query aria-label="@T("RunQuery")" placeholder="@T("RunQuery")" @bind="query" />
+            <select data-run-state-filter aria-label="@T("TraceStatus")" @bind="state">
+                <option value="">@T("AllStates")</option>
+                @foreach (var status in tab == "queue" ? QueueStates : HistoryStates)
+                {
+                    <option value="@status">@T(status)</option>
+                }
+            </select>
+            <button type="submit" data-run-query-submit disabled="@busy">@T("RefreshRuns")</button>
+        </form>
+        @if (!busy && rows.Length == 0)
+        {
+            <p role="status">@T("NoRuns")</p>
+        }
+        <ol class="trace-list" data-run-list>
+            @foreach (var run in rows)
+            {
+                <li @key="run.RunId">
+                    <button type="button" data-history-run="@run.RunId" disabled="@busy" @onclick="() => OpenRecordingAsync(run.RunId)">
+                        <strong>@run.WorkflowId</strong><span>@T(run.State) · @run.CreatedAt.ToLocalTime().ToString("g")</span>
+                        <small>@run.RunId</small>
+                    </button>
+                </li>
+            }
+        </ol>
+    </div>;
+
+    private RenderFragment NodeDetails(RunRecording recording) => @<div class="trace-node-panel">
+                <label class="trace-node-selector">@T("InspectNode")
+                    <select data-trace-inspect value="@selectedNode" @onchange="SelectNodeAsync">
+                        <option value="">@T("NoSelection")</option>
+                        @foreach (var candidate in NodeEntries(recording.Definition.Workflow).Where(item => InScope(item.Path)))
+                        {
+                            <option value="@candidate.Path">@candidate.Path · @NodeLabel(candidate.Node)</option>
+                        }
+                    </select>
+                </label>
+                @if (NodeEntries(recording.Definition.Workflow).FirstOrDefault(entry => entry.Path == selectedNode) is { Node: { } inspected } entry)
+                {
+                    <section class="trace-details" data-node-inspector="@entry.Path">
+                        <h3>@NodeLabel(inspected) · @entry.Path</h3>
+                        <details>
+                            <summary>@T("ParameterSnapshot")</summary>
+                            <pre>@JsonSerializer.Serialize(inspected.Config, WorkflowDocument.Json)</pre>
+                        </details>
+                        @if (Profile(recording.Definition, entry.Graph, inspected) is { } profile)
+                        {
+                            <details>
+                                <summary>@T("ModelSnapshot") · @profile.Id</summary>
+                                <pre>@JsonSerializer.Serialize(profile, WorkflowDocument.Json)</pre>
+                            </details>
+                        }
+                        @foreach (var item in InspectedEvents())
+                        {
+                            <details open="@(StartsOpen(item) || selectedSequence == item.Sequence)" @key="item.Sequence" data-inspected-kind="@item.Kind">
+                                <summary>@T(item.Kind) @item.IterationId
+                                    @if (item.DurationMs is { } elapsed) { <text> · @elapsed.ToString("F0") ms</text> }
+                                </summary>
+                                @if (item.Text is not null)
+                                {
+                                    <p>@(UiText.Keys.Contains(item.Text) ? T(item.Text) : item.Text)</p>
+                                }
+                                @if (item.Kind == "ModelResult")
+                                {
+                                    <p>@T("Tokens") @(item.Usage?.TotalTokens?.ToString() ?? T("UnknownUsage"))
+                                        @if (item.Usage is { } usage)
+                                        {
+                                            <text> (@T("Input") @(usage.InputTokens?.ToString() ?? "–"), @T("Output") @(usage.OutputTokens?.ToString() ?? "–"))</text>
+                                        }
+                                    </p>
+                                }
+                                @if (item.Value is { } value)
+                                {
+                                    <pre data-trace-value="@item.Kind">@FullValue(value)</pre>
+                                    @if (value.ArtifactId is { } id && !artifacts.ContainsKey(id))
+                                    {
+                                        <button type="button" data-trace-artifact disabled="@busy" @onclick="() => LoadArtifactAsync(id)">@T("LoadArtifact") · @value.Length</button>
+                                    }
+                                    else if (value.Truncated)
+                                    {
+                                        <p>@T("ArtifactTruncated") · @value.Length</p>
+                                    }
+                                }
+                            </details>
+                        }
+                    </section>
+                }
+            </div>;
+}

@@ -1,0 +1,9 @@
+bin/
+obj/
+.vs/
+*.user
+TestResults/
+.codegraph/
+work/
+outputs/
+/poc/AgentFlow.Editor.POC/wwwroot/_content/Z.Blazor.Diagrams/

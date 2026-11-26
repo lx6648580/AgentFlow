@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "AgentFlow.DeviceSample": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:54125;http://localhost:54126"
+    }
+  }
+}

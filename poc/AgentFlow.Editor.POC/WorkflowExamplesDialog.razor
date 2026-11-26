@@ -1,0 +1,135 @@
+@using System.Text.Json
+@inject IJSRuntime Js
+@{
+    var matches = Matches.ToArray();
+    var current = selected is not null && matches.Contains(selected) ? selected : matches.FirstOrDefault();
+}
+
+<dialog id="workflow-examples" class="model-manager workflow-examples" aria-labelledby="workflow-examples-title" @ref="dialog">
+    <header class="model-manager-heading">
+        <h2 id="workflow-examples-title">@Board.T("WorkflowExamples")</h2>
+        <form method="dialog"><button type="submit">@Board.T("Close")</button></form>
+    </header>
+    <div class="workflow-examples-body">
+        <div class="example-list">
+            <input type="search" aria-label="@Board.T("ExampleSearch")" placeholder="@Board.T("ExampleSearch")"
+                   autofocus @bind="query" @bind:event="oninput" />
+            <div class="example-choices">
+                @foreach (var group in matches.GroupBy(example => example.Group))
+                {
+                    <section>
+                        <h3>@Board.T(group.Key)</h3>
+                        @foreach (var example in group)
+                        {
+                            <button type="button" data-example="@example.Id" aria-pressed="@(example == current ? "true" : "false")"
+                                    @onclick="() => Select(example)">@Board.T(example.Title)</button>
+                        }
+                    </section>
+                }
+            </div>
+        </div>
+        @if (current is not null)
+        {
+            var nodes = ExampleNodes(current);
+            var missing = nodes.Any(node => Board.ExampleNode(node) is null);
+            <section class="example-description" aria-label="@Board.T(current.Title)">
+                <h3>@Board.T(current.Title)</h3>
+                <p data-example-guide>@Board.Label(current.Guide, "")</p>
+                @if (current.Requirement is { } requirement)
+                {
+                    <p class="example-note">@Board.T(requirement)</p>
+                }
+                @if (current.EditorOnly)
+                {
+                    <p class="example-note">@Board.T("ExampleEditorOnly")</p>
+                }
+                <h4>@Board.T("ExampleNodes")</h4>
+                <ul class="example-nodes">
+                    @foreach (var node in nodes)
+                    {
+                        <li data-example-node="@node.TypeId" title="@node.TypeId">@NodeLabel(node)</li>
+                    }
+                </ul>
+                @if (missing || error is not null)
+                {
+                    <p role="alert">@Board.T(missing ? "ExampleMissingNode" : error!)</p>
+                }
+                <button class="run-primary" type="button" data-load-example disabled="@(loading || missing)"
+                        @onclick="() => LoadAsync(current)">@Board.T("LoadExample")</button>
+            </section>
+        }
+        else
+        {
+            <p role="status">@Board.T("NoExamples")</p>
+        }
+    </div>
+</dialog>
+
+@code {
+    [Parameter, EditorRequired] public Pages.Home Board { get; set; } = default!;
+    private static readonly WorkflowNode TerminalNode = new("terminal", NodeTypes.RunTerminal, 1, new());
+    private readonly Dictionary<string, WorkflowDocument> definitions = [];
+    private ElementReference dialog;
+    private WorkflowExample? selected;
+    private string query = "";
+    private string? error;
+    private bool opening, loading;
+
+    private IEnumerable<WorkflowExample> Matches => WorkflowExamples.All.Where(example => definitions.ContainsKey(example.Id) &&
+        (string.IsNullOrWhiteSpace(query) || Contains(Board.T(example.Title)) || Contains(Board.T(example.Group)) ||
+         ExampleNodes(example).Any(node => Contains(NodeLabel(node)) || Contains(node.TypeId))));
+    private bool Contains(string value) => value.Contains(query.Trim(), StringComparison.OrdinalIgnoreCase);
+    private string NodeLabel(WorkflowNode node) => Board.Label(Board.ExampleNode(node)?.Name, node.TypeId);
+
+    private WorkflowNode[] ExampleNodes(WorkflowExample example)
+    {
+        var nodes = WorkflowExamples.Nodes(definitions[example.Id]);
+        return (example.EditorOnly ? nodes : nodes.Append(TerminalNode)).DistinctBy(node => node.TypeId).ToArray();
+    }
+
+    public Task OpenAsync()
+    {
+        if (definitions.Count == 0)
+        {
+            foreach (var example in WorkflowExamples.All)
+            {
+                using var stream = typeof(WorkflowExamples).Assembly.GetManifestResourceStream(example.Resource)
+                    ?? throw new InvalidOperationException($"Example resource '{example.Resource}' is missing.");
+                definitions.Add(example.Id, JsonSerializer.Deserialize<WorkflowDocument>(stream, WorkflowDocument.Json)
+                    ?? throw new JsonException($"Example '{example.Id}' has no workflow."));
+            }
+        }
+        query = "";
+        error = null;
+        opening = true;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (opening)
+        {
+            opening = false;
+            await Js.InvokeVoidAsync("agentFlow.showModal", dialog);
+        }
+    }
+
+    private void Select(WorkflowExample example)
+    {
+        selected = example;
+        error = null;
+    }
+
+    private async Task LoadAsync(WorkflowExample example)
+    {
+        loading = true;
+        error = null;
+        try
+        {
+            await Board.LoadExampleAsync(example, definitions[example.Id]);
+            await Js.InvokeVoidAsync("agentFlow.closeModal", dialog);
+        }
+        catch (GraphError issue) { error = UiText.Keys.Contains(issue.Code) ? issue.Code : "InvalidDocument"; }
+        finally { loading = false; }
+    }
+}

@@ -1,0 +1,59 @@
+@using System.Text.Json
+
+<div class="node-form harness-tools" @onpointerdown:stopPropagation @onkeydown:stopPropagation
+     @ondblclick:stopPropagation @onwheel:stopPropagation>
+    <ul class="harness-bindings" data-harness-bindings>
+        @foreach (var reference in Bindings.Distinct(StringComparer.Ordinal))
+        {
+            <li @key="reference"><div><code>@reference</code>
+                    @if (Board.McpProfilesAvailable && !Board.McpToolOptions.Contains(reference, StringComparer.Ordinal))
+                    {
+                        <small class="parameter-error" data-mcp-unavailable>@Board.T("McpProfileUnavailable")</small>
+                    }
+                </div>
+                <button type="button" data-harness-remove="@reference" aria-label="@($"{Board.T("HarnessRemoveTool")} {reference}")"
+                        @onclick="() => WriteAsync(Bindings.Where(item => item != reference))">@Board.T("HarnessRemoveTool")</button>
+            </li>
+        }
+    </ul>
+    <select aria-label="@Board.T("HarnessReadOnlyTools")" data-harness-tool-select value="@selected"
+            @onchange="e => selected = e.Value?.ToString() ?? string.Empty">
+        <option value="">@Board.T("ChooseMcpTool")</option>
+        @foreach (var reference in Board.McpToolOptions)
+        {
+            <option value="@reference" disabled="@Bindings.Contains(reference, StringComparer.Ordinal)">@reference</option>
+        }
+    </select>
+    <button type="button" data-harness-add disabled="@(Bindings.Length >= StandardNodes.MaxAgentToolBindings ||
+        !Board.McpToolOptions.Contains(selected, StringComparer.Ordinal) || Bindings.Contains(selected, StringComparer.Ordinal))"
+            @onclick="AddAsync">@Board.T("HarnessAddTool")</button>
+    @if (!Board.McpProfilesAvailable || !Board.McpToolOptions.Any())
+    {
+        <small role="status">@Board.T("McpResourceHint")</small>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Pages.Home Board { get; set; } = default!;
+    [Parameter, EditorRequired] public CanvasNode Node { get; set; } = default!;
+    private NodeDefinition Definition => Board.Definition(Node.Definition);
+    private ParameterDefinition ToolField => Definition.Parameters.Single(parameter => parameter.Id == "tools");
+    private string selected = "";
+    private string[] Bindings => NodeValidator.ReadValue(Definition, ToolField, Node.Definition.Config) is { ValueKind: JsonValueKind.Array } value
+        ? value.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String).Select(item => item.GetString()!).ToArray() : [];
+
+    private async Task AddAsync()
+    {
+        if (Bindings.Length >= StandardNodes.MaxAgentToolBindings || Bindings.Contains(selected, StringComparer.Ordinal) ||
+            !Board.McpToolOptions.Contains(selected, StringComparer.Ordinal))
+            return;
+        await WriteAsync(Bindings.Append(selected));
+        selected = "";
+    }
+
+    private async Task WriteAsync(IEnumerable<string> references)
+    {
+        await Board.ChangeParameterAsync(Node, ToolField, JsonSerializer.Serialize(references));
+        Node.Refresh();
+    }
+}

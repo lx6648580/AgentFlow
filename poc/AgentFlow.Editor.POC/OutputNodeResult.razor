@@ -1,0 +1,121 @@
+@inject HttpClient Http
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+@inject IJSRuntime Js
+
+@if (Node.RunFrame?.Output is { } output)
+{
+    <div class="node-result" data-node-result @onpointerdown:stopPropagation @onkeydown:stopPropagation @onwheel:stopPropagation>
+        <pre data-run-output data-output-copy-area tabindex="0" aria-label="@Board.T("Output")">@output.Value.Preview</pre>
+        @if (output.Value.Length == 0)
+        {
+            <span class="output-meta">@Board.T("EmptyOutput")</span>
+        }
+        <div class="output-actions">
+            <button type="button" data-output-copy disabled="@(loading || output.Value.Truncated)"
+                    title="@Board.T(output.Value.Truncated ? "ArtifactTruncated" : "CopyOutput")"
+                    @onclick="() => CopyAsync(output)">@Board.T("Copy")</button>
+            <button type="button" data-output-details @onclick="() => OpenAsync(output)">@Board.T("OutputDetails")</button>
+            @if (copyStatus is not null) { <small role="status" data-output-copy-status>@Board.T(copyStatus)</small> }
+        </div>
+    </div>
+    <dialog class="output-dialog" @ref="dialog" aria-label="@Board.T("OutputDetails")"
+            @onpointerdown:stopPropagation @onkeydown:stopPropagation @onwheel:stopPropagation>
+        <header>
+            <h2>@Board.T("OutputDetails") · @output.NodeId</h2>
+            <form method="dialog"><button type="submit" aria-label="@Board.T("Close")">@Board.T("Close")</button></form>
+        </header>
+        <p class="output-meta">@(output.ContentType == "application/json" ? "JSON" : Board.T("Text")) · @output.Value.Length</p>
+        @if (loading)
+        {
+            <p role="status">@Board.T("Loading")</p>
+        }
+        @if (loadError)
+        {
+            <p role="alert">@Board.T("TraceUnavailable")</p>
+        }
+        <pre data-output-full data-output-copy-area tabindex="0">@((full ?? output.Value.Preview))</pre>
+        @if (output.Value.Truncated)
+        {
+            <p>@Board.T("ArtifactTruncated")</p>
+        }
+        else
+        {
+            <button type="button" data-output-download disabled="@(loading || (output.Value.ArtifactId is not null && full is null))"
+                    @onclick="() => DownloadAsync(output)">@Board.T("DownloadOutput")</button>
+        }
+    </dialog>
+}
+else if (Node.RunFrame?.Preview is { } preview)
+{
+    <div class="node-result" @onpointerdown:stopPropagation @onwheel:stopPropagation>
+        <pre data-run-output tabindex="0" aria-label="@Board.T("Output")">@preview</pre>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public CanvasNode Node { get; set; } = default!;
+    [Parameter, EditorRequired] public Pages.Home Board { get; set; } = default!;
+    private ElementReference dialog;
+    private bool loading, loadError;
+    private Guid? loadedArtifact;
+    private string? full;
+    private string? copyStatus;
+
+    private async Task OpenAsync(RunOutput output)
+    {
+        await Js.InvokeVoidAsync("agentFlow.showModal", dialog);
+        await FullValueAsync(output);
+    }
+
+    private async Task<string?> FullValueAsync(RunOutput output)
+    {
+        if (output.Value.Truncated)
+            return null;
+        if (output.Value.ArtifactId is not { } artifact)
+            return output.Value.Preview;
+        if (artifact == loadedArtifact)
+            return full;
+        if (loading || Node.RunId is not { } runId)
+            return null;
+        loading = true;
+        loadError = false;
+        full = null;
+        try
+        {
+            var host = HostApi.BaseAddress(Configuration["NodeCatalogUrl"]);
+            if (host is null)
+            {
+                loadError = true;
+                return null;
+            }
+            full = await Http.GetStringAsync(new Uri(host, $"api/runs/{runId}/artifacts/{artifact}"));
+            loadedArtifact = artifact;
+            return full;
+        }
+        catch (Exception issue) when (HostApi.IsNetworkError(issue))
+        {
+            loadError = true;
+            return null;
+        }
+        finally { loading = false; }
+    }
+
+    private async Task CopyAsync(RunOutput output)
+    {
+        copyStatus = null;
+        try
+        {
+            var value = await FullValueAsync(output);
+            copyStatus = value is not null && await Js.InvokeAsync<bool>("agentFlow.copyText", value) ? "OutputCopied" : "OutputCopyFailed";
+        }
+        catch (JSException) { copyStatus = "OutputCopyFailed"; }
+    }
+
+    private async Task DownloadAsync(RunOutput output)
+    {
+        var name = new string(output.NodeId.Select(character => char.IsLetterOrDigit(character) || character is '-' or '_'
+            ? character : '_').Take(60).ToArray());
+        var extension = output.ContentType == "application/json" ? "json" : "txt";
+        await Js.InvokeVoidAsync("agentFlow.download", $"output-{name}.{extension}", full ?? output.Value.Preview, output.ContentType);
+    }
+}

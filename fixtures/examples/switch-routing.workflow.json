@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "0.1",
+  "workflowId": "switch-routing",
+  "revision": 1,
+  "nodes": [
+    {"id":"input","typeId":"core.text-input","version":1,"config":{"text":"{\"priority\":\"urgent\",\"request\":\"Inspect pump-01\"}"}},
+    {"id":"route","typeId":"flow.switch","version":1,"config":{"parameters":{"path":"/priority","a":"urgent","b":"routine"}}},
+    {"id":"urgent","typeId":"core.output","version":1,"config":{}},
+    {"id":"routine","typeId":"core.output","version":1,"config":{}},
+    {"id":"fallback","typeId":"core.output","version":1,"config":{}}
+  ],
+  "edges": [
+    {"id":"input-route","source":"input","sourcePort":"text","target":"route","targetPort":"in","kind":"message"},
+    {"id":"route-urgent","source":"route","sourcePort":"a","target":"urgent","targetPort":"value","kind":"message"},
+    {"id":"route-routine","source":"route","sourcePort":"b","target":"routine","targetPort":"value","kind":"message"},
+    {"id":"route-fallback","source":"route","sourcePort":"other","target":"fallback","targetPort":"value","kind":"message"}
+  ],
+  "layout": {
+    "input":{"x":50,"y":145}, "route":{"x":340,"y":145},
+    "urgent":{"x":645,"y":40}, "routine":{"x":645,"y":220}, "fallback":{"x":645,"y":400}
+  }
+}

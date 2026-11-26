@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/examples/">
+    <Project Path="examples/AgentFlow.SampleNodes/AgentFlow.SampleNodes.csproj" />
+    <Project Path="examples/AgentFlow.DeviceSample/AgentFlow.DeviceSample.csproj" />
+  </Folder>
+  <Folder Name="/poc/">
+    <Project Path="poc/AgentFlow.Editor.POC/AgentFlow.Editor.POC.csproj" />
+    <Project Path="poc/AgentFlow.Maf.POC/AgentFlow.Maf.POC.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/AgentFlow.NodeHost/AgentFlow.NodeHost.csproj" />
+    <Project Path="src/AgentFlow.NodeSdk/AgentFlow.NodeSdk.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AgentFlow.Phase00.Tests/AgentFlow.Phase00.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,39 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Playwright" Version="1.65.0" />
+    <ProjectReference Include="../../poc/AgentFlow.Maf.POC/AgentFlow.Maf.POC.csproj" />
+    <Compile Include="../../poc/AgentFlow.Editor.POC/UiText.cs" Link="UiText.cs" />
+    <Compile Include="../../poc/AgentFlow.Editor.POC/WorkflowExamples.cs" Link="WorkflowExamples.cs" />
+    <EmbeddedResource Include="../../fixtures/examples/*.workflow.json" LogicalName="examples.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="../../fixtures/phase03/chat.workflow.json" LogicalName="chat.workflow.json" />
+    <EmbeddedResource Include="../../fixtures/phase04/*.workflow.json" LogicalName="phase04.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="../../fixtures/phase06/*.workflow.json" LogicalName="phase06.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="../../fixtures/phase07/*.workflow.json" LogicalName="phase07.%(Filename)%(Extension)" />
+    <Content Include="../../fixtures/phase00/*.workflow.json" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../fixtures/phase01/*.workflow.json" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../fixtures/phase03/*.workflow.json" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../fixtures/phase04/*.workflow.json" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../fixtures/phase06/*.workflow.json" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../fixtures/phase07/*.workflow.json" Link="phase07/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\examples\AgentFlow.SampleNodes\AgentFlow.SampleNodes.csproj" />
+  </ItemGroup>
+
+</Project>

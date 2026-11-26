@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "0.1",
+  "workflowId": "device-diagnosis",
+  "revision": 1,
+  "nodes": [
+    {"id":"input","typeId":"core.text-input","version":1,"config":{"text":"pump-01"}},
+    {"id":"status","typeId":"tool.http-read","version":1,"config":{"parameters":{"connection":"device-api"}}},
+    {"id":"state","typeId":"data.json-transform","version":1,"config":{"parameters":{"path":"/state","format":"text"}}},
+    {"id":"agent","typeId":"ai.agent","version":1,"config":{"text":"Diagnose the device based on its status. For warning, suggest checking the pump temperature. Give one short actionable recommendation."}},
+    {"id":"model","typeId":"ai.chat-model","version":1,"config":{"text":"mock"}},
+    {"id":"output","typeId":"core.output","version":1,"config":{}}
+  ],
+  "edges": [
+    {"id":"edge-1","source":"input","sourcePort":"text","target":"status","targetPort":"in","kind":"message"},
+    {"id":"edge-2","source":"status","sourcePort":"text","target":"state","targetPort":"in","kind":"message"},
+    {"id":"edge-3","source":"state","sourcePort":"text","target":"agent","targetPort":"in","kind":"message"},
+    {"id":"edge-4","source":"agent","sourcePort":"text","target":"output","targetPort":"value","kind":"message"},
+    {"id":"use-model","source":"model","sourcePort":"model","target":"agent","targetPort":"model","kind":"resource"}
+  ],
+  "layout": {
+    "input": {"x":55,"y":145},
+    "status": {"x":345,"y":145},
+    "state": {"x":635,"y":145},
+    "agent": {"x":930,"y":145},
+    "model": {"x":645,"y":370},
+    "output": {"x":1215,"y":145}
+  }
+}

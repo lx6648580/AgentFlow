@@ -1,0 +1,65 @@
+{
+  "schemaVersion": "0.1",
+  "workflowId": "durable-input",
+  "revision": 1,
+  "nodes": [
+    {
+      "id": "input",
+      "typeId": "core.text-input",
+      "version": 1,
+      "config": {
+        "text": "A title is required."
+      }
+    },
+    {
+      "id": "request",
+      "typeId": "human.input",
+      "version": 1,
+      "config": {
+        "parameters": {
+          "assignee": "operator",
+          "prompt": "Provide the release title.",
+          "seconds": 300
+        }
+      }
+    },
+    {
+      "id": "output",
+      "typeId": "core.output",
+      "version": 1,
+      "config": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-0",
+      "source": "input",
+      "sourcePort": "text",
+      "target": "request",
+      "targetPort": "in",
+      "kind": "message"
+    },
+    {
+      "id": "edge-1",
+      "source": "request",
+      "sourcePort": "text",
+      "target": "output",
+      "targetPort": "value",
+      "kind": "message"
+    }
+  ],
+  "layout": {
+    "input": {
+      "x": 55,
+      "y": 125
+    },
+    "request": {
+      "x": 320,
+      "y": 125
+    },
+    "output": {
+      "x": 585,
+      "y": 125
+    }
+  }
+}

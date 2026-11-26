@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "0.1",
+  "workflowId": "device-file",
+  "revision": 1,
+  "nodes": [
+    {"id":"input","typeId":"core.text-input","version":1,"config":{"text":"pump-01"}},
+    {"id":"status","typeId":"tool.file-read","version":1,"config":{"parameters":{"path":"device-status.json"}}},
+    {"id":"state","typeId":"data.json-transform","version":1,"config":{"parameters":{"path":"/state","format":"text"}}},
+    {"id":"output","typeId":"core.output","version":1,"config":{}}
+  ],
+  "edges": [
+    {"id":"edge-1","source":"input","sourcePort":"text","target":"status","targetPort":"in","kind":"message"},
+    {"id":"edge-2","source":"status","sourcePort":"text","target":"state","targetPort":"in","kind":"message"},
+    {"id":"edge-3","source":"state","sourcePort":"text","target":"output","targetPort":"value","kind":"message"}
+  ],
+  "layout": {
+    "input": {"x":55,"y":145},
+    "status": {"x":345,"y":145},
+    "state": {"x":635,"y":145},
+    "output": {"x":950,"y":145}
+  }
+}

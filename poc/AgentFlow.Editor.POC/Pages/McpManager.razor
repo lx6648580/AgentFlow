@@ -1,0 +1,144 @@
+@using System.Net.Http.Json
+@using System.Text.Json
+@inject IConfiguration Configuration
+
+<div class="model-manager-body">
+    <section class="model-list" aria-label="@T("McpConnections")">
+        <div class="model-list-actions">
+            <button type="button" data-mcp-new disabled="@busy" @onclick="() => Select(null)">@T("NewMcpConnection")</button>
+            <button type="button" data-mcp-reload disabled="@busy" @onclick="Board.LoadMcpProfilesAsync">@T("ReloadProfiles")</button>
+        </div>
+        <ul>
+            @foreach (var profile in Board.McpProfiles)
+            {
+                <li @key="profile.Id">
+                    <button type="button" data-mcp-profile="@profile.Id" disabled="@busy"
+                            aria-current="@(current?.Id == profile.Id ? "true" : null)" @onclick="() => Select(profile)">
+                        <strong>@profile.Id</strong>
+                        <small>@profile.Url</small>
+                    </button>
+                </li>
+            }
+        </ul>
+    </section>
+    <section class="model-editor">
+        <h3>@(current?.Id ?? T("NewMcpConnection"))</h3>
+        <form @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <fieldset class="profile-form" disabled="@(!Board.McpProfilesAvailable || busy)">
+                <label>@T("ProfileId") <input data-mcp-id required maxlength="40" readonly="@(current is not null)" @bind="id" /></label>
+                <label>@T("McpEndpoint") <input data-mcp-url required type="url" @bind="url" /></label>
+                <label>@T("McpAllowedTools")
+                    <textarea data-mcp-allowlist rows="3" @bind="allowedText"></textarea>
+                </label>
+                <div class="model-editor-actions">
+                    <button type="submit" data-mcp-save class="model-primary">@T("Save")</button>
+                    <button type="button" data-mcp-discover disabled="@(string.IsNullOrWhiteSpace(url))" @onclick="DiscoverAsync">@T("DiscoverMcpTools")</button>
+                    @if (current is not null)
+                    {
+                        <button type="button" data-mcp-delete @onclick="() => confirmDelete = true">@T("McpDelete")</button>
+                    }
+                </div>
+            </fieldset>
+        </form>
+        @if (confirmDelete && current is not null)
+        {
+            <div class="model-editor-actions">
+                <button type="button" data-mcp-confirm-delete disabled="@busy" @onclick="DeleteAsync">@T("McpConfirmDelete")</button>
+                <button type="button" disabled="@busy" @onclick="() => confirmDelete = false">@T("Cancel")</button>
+            </div>
+        }
+        @if (discoveredUrl == url.Trim() && discovered.Length > 0)
+        {
+            <ul class="mcp-management-tools" data-mcp-discovery>
+                @foreach (var tool in discovered)
+                {
+                    <li @key="tool.Name">
+                        <label><input type="checkbox" data-mcp-allow="@tool.Name" disabled="@busy" checked="@Allowed.Contains(tool.Name, StringComparer.Ordinal)"
+                                      @onchange="args => ToggleTool(tool.Name, args.Value is true)" /> <code>@tool.Name</code></label>
+                        @if (!string.IsNullOrWhiteSpace(tool.Description)) { <p>@tool.Description</p> }
+                        <details><summary>@T("ToolInputSchema")</summary><pre>@JsonSerializer.Serialize(tool.InputSchema, WorkflowDocument.Json)</pre></details>
+                    </li>
+                }
+            </ul>
+        }
+        <p role="status" data-mcp-feedback="@feedback">@T(feedback ?? (Board.McpProfilesAvailable ? "" : "ToolUnavailable"))</p>
+    </section>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Home Board { get; set; } = default!;
+    [Parameter, EditorRequired] public string Culture { get; set; } = "en";
+    private McpProfile? current;
+    private string id = "", url = "", allowedText = "";
+    private string? feedback, discoveredUrl;
+    private McpToolInfo[] discovered = [];
+    private bool busy, confirmDelete;
+    private string[] Allowed => allowedText.Split(['\r', '\n', ','], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+        .Distinct(StringComparer.Ordinal).ToArray();
+    private string T(string key) => string.IsNullOrEmpty(key) ? "" : UiText.Get(key, Culture);
+    protected override void OnInitialized() => Select(Board.McpProfiles.FirstOrDefault());
+
+    private void Select(McpProfile? profile)
+    {
+        current = profile;
+        id = profile?.Id ?? "";
+        url = profile?.Url ?? "";
+        allowedText = profile is null ? "" : string.Join("\n", profile.Tools);
+        feedback = discoveredUrl = null;
+        confirmDelete = false;
+        discovered = [];
+    }
+
+    private void ToggleTool(string name, bool allow)
+    {
+        var tools = Allowed.Where(item => item != name);
+        allowedText = string.Join("\n", allow ? tools.Append(name) : tools);
+    }
+
+    private Task SaveAsync() => RequestAsync(async http =>
+    {
+        var profile = new McpProfile(id.Trim(), url.Trim(), Allowed);
+        var route = current is null ? "api/tools/mcp-connections?createOnly=true" : "api/tools/mcp-connections";
+        using var response = await http.PostAsJsonAsync(route, profile);
+        if (!response.IsSuccessStatusCode)
+            return (await HostApi.ReadErrorAsync(response, default, "McpProfileSaveFailed", "McpProfileUnavailable")).Code;
+        Select(await response.Content.ReadFromJsonAsync<McpProfile>());
+        await Board.LoadMcpProfilesAsync();
+        return "ProfileSaved";
+    });
+
+    private Task DiscoverAsync() => RequestAsync(async http =>
+    {
+        var endpoint = url.Trim();
+        using var response = await http.PostAsJsonAsync("api/tools/mcp-connections/discover", new McpEndpointRequest(endpoint));
+        if (!response.IsSuccessStatusCode)
+            return (await HostApi.ReadErrorAsync(response, default, "ToolUnavailable", "ToolUnavailable")).Code;
+        discovered = await response.Content.ReadFromJsonAsync<McpToolInfo[]>() ?? [];
+        discoveredUrl = endpoint;
+        return discovered.Length == 0 ? "NoToolsDiscovered" : null;
+    });
+
+    private Task DeleteAsync() => RequestAsync(async http =>
+    {
+        if (current is not { } profile)
+            return null;
+        using var response = await http.DeleteAsync($"api/tools/mcp-connections/{Uri.EscapeDataString(profile.Id)}");
+        if (!response.IsSuccessStatusCode)
+            return (await HostApi.ReadErrorAsync(response, default, "McpProfileSaveFailed", "McpProfileUnavailable")).Code;
+        Select(null);
+        await Board.LoadMcpProfilesAsync();
+        return "McpProfileDeleted";
+    });
+
+    private async Task RequestAsync(Func<HttpClient, Task<string?>> request)
+    {
+        if (busy || HostApi.BaseAddress(Configuration["NodeCatalogUrl"]) is not { } host)
+            return;
+        busy = true;
+        feedback = null;
+        using var http = new HttpClient { BaseAddress = host, Timeout = TimeSpan.FromSeconds(12) };
+        try { feedback = await request(http); }
+        catch (Exception error) when (HostApi.IsNetworkError(error)) { feedback = "ToolUnavailable"; }
+        finally { busy = false; }
+    }
+}

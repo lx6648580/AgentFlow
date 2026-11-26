@@ -1,0 +1,71 @@
+<dialog id="model-manager" class="model-manager" aria-labelledby="model-manager-title" @ref="dialog">
+    <header class="model-manager-heading">
+        <h2 id="model-manager-title">@T("ResourceManager")</h2>
+        <form method="dialog">
+            <button type="submit" data-model-close>@T("Close")</button>
+        </form>
+    </header>
+    <nav class="resource-tabs" aria-label="@T("ResourceManager")">
+        <button type="button" data-resource-tab="models" aria-pressed="@(!showMcp ? "true" : "false")"
+                @onclick="() => showMcp = false">@T("ModelManager")</button>
+        <button type="button" data-resource-tab="mcp" aria-pressed="@(showMcp ? "true" : "false")"
+                @onclick="() => showMcp = true">@T("McpConnections")</button>
+    </nav>
+    @if (showMcp)
+    {
+        <McpManager Board="Board" Culture="@Culture" />
+    }
+    else
+    {
+    <div class="model-manager-body">
+        <section class="model-list" aria-label="@T("ModelManager")">
+            <div class="model-list-actions">
+                <button type="button" data-model-new disabled="@(!Available || busy)" @onclick="NewProfile">@T("NewProfile")</button>
+                <button type="button" data-model-reload disabled="@busy" @onclick="ReloadAsync">@T("ReloadProfiles")</button>
+            </div>
+            @if (!Available)
+            {
+                <p role="status" class="model-list-status">@T("ModelCatalogUnavailable")</p>
+            }
+            <ul>
+                @foreach (var item in Profiles)
+                {
+                    <li @key="item.Id">
+                        <button type="button" data-model-profile="@item.Id" disabled="@busy"
+                                aria-current="@(savedProfile?.Id == item.Id ? "true" : null)"
+                                @onclick="() => SetProfile(item)">
+                            <strong>@item.Id</strong>
+                            @if (item.ModelId != item.Id)
+                            {
+                                <small>@item.ModelId</small>
+                            }
+                        </button>
+                    </li>
+                }
+            </ul>
+        </section>
+        <section class="model-editor">
+            <h3>@(savedProfile?.Id ?? T("NewProfile"))</h3>
+            <form @onsubmit="SaveAsync" @onsubmit:preventDefault>
+                <fieldset class="profile-form" disabled="@(!Available || busy)">
+                    <label>@T("ProfileId") <input data-model-id required maxlength="40" readonly="@(savedProfile is not null)" @bind="profileId" /></label>
+                    <label>Base URL <input data-model-url type="url" placeholder="http://127.0.0.1:8000/v1" disabled="@IsMock" required="@(!IsMock)" @bind="baseUrl" /></label>
+                    <label>Model ID <input data-model-provider required maxlength="200" disabled="@IsMock" @bind="modelId" /></label>
+                    <label>SecretRef <input data-model-secret autocomplete="off" maxlength="64" disabled="@IsMock" @bind="secretRef" /></label>
+                    <div class="profile-numbers">
+                        <label>@T("TimeoutSeconds") <input data-model-timeout type="number" min="1" max="600" required @bind="timeout" /></label>
+                        <label>@T("Temperature") <input data-model-temperature type="number" min="0" max="2" step="any" required @bind="temperature" /></label>
+                        <label>@T("MaxTokens") <input data-model-tokens type="number" min="1" max="8192" required @bind="maxTokens" /></label>
+                    </div>
+                    <label class="profile-stream"><input data-model-stream type="checkbox" @bind="streaming" /> @T("Streaming")</label>
+                    <div class="model-editor-actions">
+                        <button type="submit" data-model-save class="model-primary">@T("Save")</button>
+                        <button type="button" data-model-probe disabled="@(!CanProbe)" @onclick="ProbeAsync">@T("ProbeTools")</button>
+                    </div>
+                </fieldset>
+            </form>
+            <p role="status" class="model-feedback" data-model-feedback="@feedback">@(feedback is null ? "" : T(feedback))</p>
+        </section>
+    </div>
+    }
+</dialog>

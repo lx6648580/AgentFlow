@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "0.1",
+  "workflowId": "sdk-json",
+  "revision": 1,
+  "nodes": [
+    {"id":"input","typeId":"core.text-input","version":1,"config":{"text":"{\"device\":{\"state\":\"ready\"}}"}},
+    {"id":"parse","typeId":"sample.parse-json","version":1,"config":{}},
+    {"id":"pick","typeId":"sample.json-pick","version":1,"config":{"parameters":{"property":"device","fallback":{"state":"unknown"}}}},
+    {"id":"write","typeId":"sample.write-json","version":1,"config":{}},
+    {"id":"output","typeId":"core.output","version":1,"config":{}}
+  ],
+  "edges": [
+    {"id":"input-parse","source":"input","sourcePort":"text","target":"parse","targetPort":"in","kind":"message"},
+    {"id":"parse-pick","source":"parse","sourcePort":"out","target":"pick","targetPort":"json","kind":"message"},
+    {"id":"pick-write","source":"pick","sourcePort":"out","target":"write","targetPort":"in","kind":"message"},
+    {"id":"write-output","source":"write","sourcePort":"out","target":"output","targetPort":"value","kind":"message"}
+  ],
+  "layout": {
+    "input":{"x":55,"y":85}, "parse":{"x":315,"y":85}, "pick":{"x":575,"y":85},
+    "write":{"x":850,"y":135}, "output":{"x":1110,"y":135}
+  }
+}

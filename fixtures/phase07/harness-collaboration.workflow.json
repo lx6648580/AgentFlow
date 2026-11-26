@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "0.1",
+  "workflowId": "harness-collaboration",
+  "revision": 1,
+  "nodes": [
+    {"id":"input","typeId":"core.text-input","version":1,"config":{"text":"{\"deviceId\":\"pump-01\",\"needsTool\":true}"}},
+    {"id":"route","typeId":"flow.condition","version":1,"config":{"text":"/needsTool == true"}},
+    {"id":"triage","typeId":"ai.agent","version":1,"config":{"text":"Identify the device to check. Reply with exactly the input JSON unchanged, with no commentary or markdown."}},
+    {"id":"harness","typeId":"ai.harness-agent","version":1,"config":{"text":"Call devices__read_device once for the deviceId in the input. Use the tool result to give a short recommendation in English that includes the device ID and current status."}},
+    {"id":"guidance","typeId":"harness.instructions","version":1,"config":{"text":"Use the tools bound to the current request."}},
+    {"id":"toolset","typeId":"harness.mcp-tools","version":1,"config":{"parameters":{"tools":["devices/read_device"]}}},
+    {"id":"function-loop","typeId":"harness.function-loop","version":1,"config":{"parameters":{"maximumIterations":5,"maxToolCalls":4}}},
+    {"id":"compaction","typeId":"harness.compaction","version":1,"config":{"parameters":{"contextWindowTokens":16384}}},
+    {"id":"direct","typeId":"ai.prompt","version":1,"config":{"text":"No live device check requested."}},
+    {"id":"merge","typeId":"flow.merge","version":1,"config":{"parameters":{"mode":"any"}}},
+    {"id":"model","typeId":"ai.chat-model","version":1,"config":{"text":"mock"}},
+    {"id":"output","typeId":"core.output","version":1,"config":{}}
+  ],
+  "edges": [
+    {"id":"input-route","source":"input","sourcePort":"text","target":"route","targetPort":"in","kind":"message"},
+    {"id":"route-check","source":"route","sourcePort":"yes","target":"triage","targetPort":"in","kind":"message"},
+    {"id":"route-direct","source":"route","sourcePort":"no","target":"direct","targetPort":"in","kind":"message"},
+    {"id":"handover","source":"triage","sourcePort":"text","target":"harness","targetPort":"in","kind":"message"},
+    {"id":"check-answer","source":"harness","sourcePort":"text","target":"merge","targetPort":"a","kind":"message"},
+    {"id":"direct-answer","source":"direct","sourcePort":"text","target":"merge","targetPort":"b","kind":"message"},
+    {"id":"answer","source":"merge","sourcePort":"text","target":"output","targetPort":"value","kind":"message"},
+    {"id":"triage-model","source":"model","sourcePort":"model","target":"triage","targetPort":"model","kind":"resource"},
+    {"id":"harness-model","source":"model","sourcePort":"model","target":"harness","targetPort":"model","kind":"resource"},
+    {"id":"harness-guidance","source":"guidance","sourcePort":"resource","target":"harness","targetPort":"instructions","kind":"resource"},
+    {"id":"harness-tools","source":"toolset","sourcePort":"resource","target":"harness","targetPort":"tools","kind":"resource"},
+    {"id":"harness-loop","source":"function-loop","sourcePort":"resource","target":"harness","targetPort":"loop","kind":"resource"},
+    {"id":"harness-compaction","source":"compaction","sourcePort":"resource","target":"harness","targetPort":"compaction","kind":"resource"}
+  ],
+  "layout": {
+    "input": {"x":60,"y":190},
+    "route": {"x":335,"y":190},
+    "triage": {"x":610,"y":60},
+    "harness": {"x":1180,"y":80},
+    "direct": {"x":1480,"y":485},
+    "merge": {"x":1480,"y":185},
+    "model": {"x":335,"y":450},
+    "guidance": {"x":610,"y":350},
+    "toolset": {"x":610,"y":545},
+    "function-loop": {"x":900,"y":335},
+    "compaction": {"x":900,"y":530},
+    "output": {"x":1755,"y":165}
+  }
+}

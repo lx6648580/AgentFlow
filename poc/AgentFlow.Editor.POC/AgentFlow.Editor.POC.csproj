@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
+    <BlazorWebAssemblyLoadAllGlobalizationData>true</BlazorWebAssemblyLoadAllGlobalizationData>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.15" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.15" PrivateAssets="all" />
+    <PackageReference Include="MudBlazor" Version="9.14.0" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.15" />
+    <PackageReference Include="Z.Blazor.Diagrams" Version="3.0.5" GeneratePathProperty="true" />
+    <ProjectReference Include="../../src/AgentFlow.NodeSdk/AgentFlow.NodeSdk.csproj" />
+    <EmbeddedResource Include="../../fixtures/examples/*.workflow.json" LogicalName="examples.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="../../fixtures/phase03/chat.workflow.json" LogicalName="chat.workflow.json" />
+    <EmbeddedResource Include="../../fixtures/phase04/*.workflow.json" LogicalName="phase04.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="../../fixtures/phase06/*.workflow.json" LogicalName="phase06.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="../../fixtures/phase07/*.workflow.json" LogicalName="phase07.%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <!-- ponytail: 3.0.5 的 .NET 11 包清单在 .NET 10 不发布资源。升级后删除显式资源注册。 -->
+  <Target Name="ExposeDiagramAssets" BeforeTargets="ResolveProjectStaticWebAssets"
+          Condition="'$(PkgZ_Blazor_Diagrams)' != ''">
+    <PropertyGroup>
+      <DiagramAssetRoot>$(PkgZ_Blazor_Diagrams)/staticwebassets/</DiagramAssetRoot>
+      <DiagramWebRoot>wwwroot/_content/Z.Blazor.Diagrams</DiagramWebRoot>
+    </PropertyGroup>
+    <ItemGroup>
+      <DiagramAsset Include="$(DiagramAssetRoot)style.min.css;$(DiagramAssetRoot)default.styles.min.css;$(DiagramAssetRoot)script.min.js" />
+    </ItemGroup>
+    <Copy SourceFiles="@(DiagramAsset)" DestinationFolder="$(DiagramWebRoot)" SkipUnchangedFiles="true" />
+    <ItemGroup>
+      <Content Remove="$(DiagramWebRoot)/*" />
+      <Content Include="$(DiagramWebRoot)/*" />
+      <FileWrites Include="$(DiagramWebRoot)/*" />
+    </ItemGroup>
+  </Target>
+</Project>

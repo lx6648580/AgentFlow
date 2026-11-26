@@ -1,0 +1,83 @@
+{
+  "schemaVersion": "0.1",
+  "workflowId": "durable-approval",
+  "revision": 1,
+  "nodes": [
+    {
+      "id": "input",
+      "typeId": "core.text-input",
+      "version": 1,
+      "config": {
+        "text": "Release draft 42"
+      }
+    },
+    {
+      "id": "approval",
+      "typeId": "human.approval",
+      "version": 1,
+      "config": {
+        "parameters": {
+          "assignee": "operator",
+          "prompt": "Approve the release draft?",
+          "seconds": 300
+        }
+      }
+    },
+    {
+      "id": "write",
+      "typeId": "tool.simulated-write",
+      "version": 1,
+      "config": {}
+    },
+    {
+      "id": "output",
+      "typeId": "core.output",
+      "version": 1,
+      "config": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-0",
+      "source": "input",
+      "sourcePort": "text",
+      "target": "approval",
+      "targetPort": "in",
+      "kind": "message"
+    },
+    {
+      "id": "edge-1",
+      "source": "approval",
+      "sourcePort": "text",
+      "target": "write",
+      "targetPort": "in",
+      "kind": "message"
+    },
+    {
+      "id": "edge-2",
+      "source": "write",
+      "sourcePort": "text",
+      "target": "output",
+      "targetPort": "value",
+      "kind": "message"
+    }
+  ],
+  "layout": {
+    "input": {
+      "x": 55,
+      "y": 125
+    },
+    "approval": {
+      "x": 320,
+      "y": 125
+    },
+    "write": {
+      "x": 585,
+      "y": 125
+    },
+    "output": {
+      "x": 850,
+      "y": 125
+    }
+  }
+}

@@ -1,0 +1,187 @@
+@using System.Globalization
+@using Microsoft.AspNetCore.Components.Sections
+@{
+    var definition = Board.Definition(Node.Definition);
+    var output = definition.TypeId == NodeTypes.Output;
+    var sized = output && !Node.Collapsed && Node.OutputWidth is not null && Node.OutputHeight is not null;
+    var style = sized ? string.Create(CultureInfo.InvariantCulture, $"width:{Node.OutputWidth}px;height:{Node.OutputHeight}px") : null;
+}
+
+<article class="flow-node @(Node.Selected ? "selected" : "") @(Node.Active ? "active" : "")"
+         style="@style" data-output-sized="@(sized ? "true" : null)"
+         data-node="@Node.Id" data-kind="@Node.Definition.TypeId" data-mode="@Node.Mode" data-locked="@Node.Locked.ToString().ToLowerInvariant()"
+         data-node-state="@Node.RunState" data-inspected="@(Node.Inspected ? "true" : null)">
+    <header class="node-handle" @ondblclick="() => Board.OpenSubworkflowAsync(Node)">
+        <span class="node-grip" aria-hidden="true">⠿</span>
+        <strong title="@Board.Label(definition.Help, Board.Label(definition.Name, definition.TypeId))">@Board.Label(definition.Name, definition.TypeId)</strong>
+        @if (Node.RunState is { } runState && runState != "Idle")
+        {
+            <span class="node-run-status">@Board.T(runState == "Failed" ? "NodeFailed" : runState)</span>
+        }
+        @if (Node.Mode is { } mode)
+        {
+            <span class="node-mode">@Board.T(mode)</span>
+        }
+        @if (Node.Locked)
+        {
+            <span class="node-lock" title="@Board.T("Lock")" aria-label="@Board.T("Lock")">▣</span>
+        }
+        @if (Node.Definition.TypeId == NodeTypes.Subworkflow)
+        {
+            <button type="button" data-open-subworkflow title="@Board.T("OpenSubworkflow")" aria-label="@Board.T("OpenSubworkflow")"
+                    @onpointerdown:stopPropagation @onclick:stopPropagation @ondblclick:stopPropagation
+                    @onclick="() => Board.OpenSubworkflowAsync(Node)">↗</button>
+        }
+        <button type="button" data-node-help title="@Board.T("NodeHelp")" aria-label="@Board.T("NodeHelp")"
+                aria-haspopup="dialog" aria-controls="node-help-dialog"
+                @onpointerdown:stopPropagation @onpointerup:stopPropagation @onclick:stopPropagation @ondblclick:stopPropagation
+                @onclick="() => Board.OpenNodeHelpAsync(Node)">?</button>
+        <button type="button" title="@Board.T("Toggle")" aria-label="@Board.T("Toggle")"
+                @onpointerdown:stopPropagation @onclick:stopPropagation @onclick="() => Board.Toggle(Node)">
+            @(Node.Collapsed ? "+" : "−")
+        </button>
+    </header>
+    @if (definition.TypeId == NodeTypes.RunTerminal)
+    {
+        <div class="terminal-body" hidden="@Node.Collapsed" @onpointerdown:stopPropagation @ondblclick:stopPropagation @onwheel:stopPropagation>
+            <SectionOutlet SectionName="run-terminal" />
+        </div>
+    }
+    @if (Node.Ports.Count > 0)
+    {
+    <div class="node-ports">
+        @foreach (var port in Node.Ports.Cast<CanvasPort>())
+        {
+            var portName = Board.PortName(Node, port, definition);
+            <div class="port-row @(port.Spec.Output ? "out" : "in")" @key="port" data-port="@port.Id"
+                 data-resource="@port.Spec.ResourceKind"
+                 title="@(portName + " · " + Board.T(port.Spec.ResourceKind is null ? port.Spec.Type : "LibraryResourcePort") + " " + Board.Label(port.Spec.Help, ""))">
+                <PortRenderer Port="port" Class="flow-port" />
+                <span>@portName</span>
+            </div>
+        }
+    </div>
+    }
+    @if (Node.RunFrame?.Error is { } runError)
+    {
+        <p class="node-run-error" data-node-run-error="@runError">@Board.T(runError)</p>
+    }
+    @if (output && !Node.Collapsed && Node.RunId is { } runId)
+    {
+        <OutputNodeResult Node="Node" Board="Board" @key="runId" />
+    }
+    @if (output && !Node.Collapsed && !Node.Locked)
+    {
+        <button class="output-resize" type="button" data-output-resize title="@Board.T("ResizeOutput")"
+                aria-label="@Board.T("ResizeOutput")"></button>
+    }
+    @if (!Node.Collapsed && definition.Parameters.Count > 0)
+    {
+        <div class="node-form" @onpointerdown:stopPropagation @onkeydown:stopPropagation
+             @ondblclick:stopPropagation @onwheel:stopPropagation>
+            @foreach (var field in definition.Parameters.Where(field => Node.Definition.TypeId switch
+            {
+                NodeTypes.HarnessMcpTools or NodeTypes.Agent => field.Id != "tools",
+                NodeTypes.McpTool => field.Id is not ("server" or "tool"),
+                _ => true
+            }))
+            {
+                var label = Board.Label(field.Label, field.Id);
+                var value = NodeValidator.ReadValue(definition, field, Node.Definition.Config);
+                var error = Board.ParameterError(Node, field.Id);
+                var state = error is null ? "false" : "true";
+                <label class="node-parameter" @key="field.Id" title="@Board.Label(field.Help, "")">
+                    @if (Node.Definition.TypeId != NodeTypes.Input)
+                    {
+                        <span class="config-label">@label</span>
+                    }
+                    @switch (field.Kind)
+                    {
+                        case "multiline" when Node.Definition.TypeId == NodeTypes.Model && field.Id == definition.LegacyTextParameter:
+                            var profileId = Pages.Home.ParameterText(value).Trim();
+                            var unavailable = profileId.Length > 0 && !Board.ModelProfiles.Any(profile => profile.Id == profileId);
+                            <select data-node-model data-parameter="@field.Id" aria-label="@label"
+                                    aria-invalid="@(unavailable && Board.ModelProfilesAvailable ? "true" : state)"
+                                    @key="Board.ModelProfiles" value="@profileId"
+                                    @onchange="e => Board.ChangeParameterAsync(Node, field, e.Value)">
+                                <option value="" disabled>@Board.T("ChooseModelProfile")</option>
+                                @if (unavailable)
+                                {
+                                    <option value="@profileId">@profileId · @Board.T(Board.ModelProfilesAvailable ? "MissingModelProfile" : "UnverifiedModelProfile")</option>
+                                }
+                                @foreach (var profile in Board.ModelProfiles)
+                                {
+                                    <option value="@profile.Id">@profile.Id</option>
+                                }
+                            </select>
+                            break;
+                        case "choice":
+                            <select data-parameter="@field.Id" aria-label="@label" aria-invalid="@state" value="@Pages.Home.ParameterText(value)"
+                                    @onchange="e => Board.ChangeParameterAsync(Node, field, e.Value)">
+                                @if (value is null)
+                                {
+                                    <option value="">@Board.T("ChooseParameter")</option>
+                                }
+                                @foreach (var choice in field.Choices!)
+                                {
+                                    <option value="@choice">@Board.Label(field.ChoiceLabels?.GetValueOrDefault(choice), choice)</option>
+                                }
+                            </select>
+                            break;
+                        case "toggle":
+                            <input data-parameter="@field.Id" type="checkbox" aria-label="@label"
+                                   checked="@(value?.ValueKind == System.Text.Json.JsonValueKind.True)"
+                                   @onchange="e => Board.ChangeParameterAsync(Node, field, e.Value)" />
+                            break;
+                        case "number":
+                            <input data-parameter="@field.Id" type="number" aria-label="@label" aria-invalid="@state"
+                                   step="@(field.Integer ? "1" : "any")" value="@Pages.Home.ParameterText(value)"
+                                   min="@FormatBound(field.Min)" max="@FormatBound(field.Max)"
+                                   @onchange="e => Board.ChangeParameterAsync(Node, field, e.Value)" />
+                            break;
+                        case "json":
+                            <textarea data-parameter="@field.Id" rows="2" aria-label="@label" aria-invalid="@state"
+                                      value="@value?.GetRawText()" @onchange="e => Board.ChangeParameterAsync(Node, field, e.Value)"></textarea>
+                            break;
+                        case "multiline":
+                            <textarea data-parameter="@field.Id" rows="2" aria-label="@label" aria-invalid="@state"
+                                      value="@Pages.Home.ParameterText(value)"
+                                      @oninput="e => Board.ChangeParameterAsync(Node, field, e.Value)"></textarea>
+                            break;
+                        default:
+                            <input data-parameter="@field.Id" type="text" aria-label="@label" aria-invalid="@state"
+                                   value="@Pages.Home.ParameterText(value)" @onchange="e => Board.ChangeParameterAsync(Node, field, e.Value)" />
+                            break;
+                    }
+                    @if (error is not null)
+                    {
+                        <small class="parameter-error" role="alert">@error</small>
+                    }
+                </label>
+            }
+        </div>
+    }
+    @if (!Node.Collapsed && Node.Definition.TypeId is (NodeTypes.HarnessMcpTools or NodeTypes.Agent))
+    {
+        <McpToolBindings Board="Board" Node="Node" />
+    }
+    @if (!Node.Collapsed && Node.Definition.TypeId == NodeTypes.Probe)
+    {
+        <div class="node-form node-actions" @onpointerdown:stopPropagation @onkeydown:stopPropagation>
+            <button type="button" disabled="@(Node.Definition.Config.Ports >= 16)"
+                    @onclick="() => Board.ChangePorts(Node, 1)">@Board.T("AddPort")</button>
+            <button type="button" disabled="@(Node.Definition.Config.Ports == 0)"
+                    @onclick="() => Board.ChangePorts(Node, -1)">@Board.T("RemovePort")</button>
+        </div>
+    }
+    @if (!Node.Collapsed && Node.Definition.TypeId == NodeTypes.McpTool)
+    {
+        <McpToolFields Board="Board" Node="Node" />
+    }
+</article>
+
+@code {
+    [Parameter, EditorRequired] public CanvasNode Node { get; set; } = default!;
+    [CascadingParameter] public Pages.Home Board { get; set; } = default!;
+    private static string? FormatBound(decimal? value) => value?.ToString(System.Globalization.CultureInfo.InvariantCulture);
+}
